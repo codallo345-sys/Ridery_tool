@@ -28,9 +28,6 @@ export default function App() {
             <Typography variant="h4" sx={{ color: 'white', mb: 0.5 }}>
               Ridery <span style={{ color: '#87fcd9' }}>Tools</span>
             </Typography>
-            <Typography variant="body2" sx={{ color: '#f5f5ff', opacity: 0.7 }}>
-              Generador de Incidencias
-            </Typography>
           </Box>
           
           <Chip 

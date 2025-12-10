@@ -6,6 +6,7 @@ import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import ViewStreamIcon from '@mui/icons-material/ViewStream';
 import ViewWeekIcon from '@mui/icons-material/ViewWeek';
+import { recognizeImage } from '../utils/ocrWorker';
 
 // Función auxiliar para buscar el patrón #123456
 const getTicketNumberMatch = (inputTitle) => {
@@ -21,7 +22,7 @@ const ImageSlot = React.memo(({ slot, onChange, onDelete }) => {
       const url = URL.createObjectURL(slot.file);
       setPreviewUrl(url);
       return () => {
-        URL.revokeObjectURL(url);
+        try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
         setPreviewUrl(null);
       };
     } else {
@@ -31,18 +32,64 @@ const ImageSlot = React.memo(({ slot, onChange, onDelete }) => {
 
   const ticketMatch = useMemo(() => getTicketNumberMatch(slot.title), [slot.title]);
 
+  /**
+   * processNewFile:
+   * - obtiene orientación
+   * - intenta detectar ticket desde filename
+   * - si no hay title y no hay ticket en filename, ejecuta OCR (reconocimiento) sobre la imagen
+   *   y busca patrón #\d+. Si encuentra, pone titulo `TICKET #...`
+   */
   const processNewFile = useCallback((file) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    img.onload = () => {
+
+    // Detectar ticket desde el nombre del archivo (por ejemplo "screenshot #12345.png")
+    const filenameTicket = (file.name || '').match(/#\d+/)?.[0];
+
+    img.onload = async () => {
       const orient = img.height > img.width ? 'vertical' : 'horizontal';
-      onChange({ ...slot, file, orientation: orient });
-      URL.revokeObjectURL(url);
+
+      // Construir objeto base de slot actualizado
+      const baseUpdate = { ...slot, file, orientation: orient };
+
+      // Si el slot ya tiene título, no intentamos sobrescribirlo
+      if (slot.title && slot.title.trim() !== '') {
+        onChange(baseUpdate);
+        try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
+        return;
+      }
+
+      // Si filename contiene ticket, lo usamos
+      if (filenameTicket) {
+        onChange({ ...baseUpdate, title: `TICKET ${filenameTicket}`, _ocrAttempted: true });
+        try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
+        return;
+      }
+
+      // Si no hay ticket en filename y slot no tiene title, intentamos OCR (async)
+      try {
+        // recognizeImage acepta File/Blob o URL; le pasamos el File para evitar problemas con CORS
+        const text = await recognizeImage(file);
+        const ocrMatch = (text || '').match(/#\d+/);
+        if (ocrMatch && ocrMatch[0]) {
+          onChange({ ...baseUpdate, title: `TICKET ${ocrMatch[0]}`, _ocrAttempted: true });
+        } else {
+          // no detectado: sólo actualizamos file/orientation y marcamos que intentamos OCR para no repetir
+          onChange({ ...baseUpdate, _ocrAttempted: true });
+        }
+      } catch (err) {
+        console.warn('OCR failed or was skipped', err);
+        onChange({ ...baseUpdate, _ocrAttempted: true });
+      } finally {
+        try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
+      }
     };
+
     img.onerror = () => {
-      URL.revokeObjectURL(url);
+      try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ }
       alert('No se pudo procesar la imagen.');
     };
+
     img.src = url;
   }, [slot, onChange]);
 
@@ -56,6 +103,19 @@ const ImageSlot = React.memo(({ slot, onChange, onDelete }) => {
 
   const handlePasteClick = async () => {
     try {
+      // Intentamos leer texto del portapapeles primero (puede tener #12345)
+      let clipboardText = '';
+      try {
+        clipboardText = await navigator.clipboard.readText();
+      } catch (e) {
+        clipboardText = '';
+      }
+      const textTicket = clipboardText.match(/#\d+/)?.[0];
+      if (textTicket && (!slot.title || slot.title.trim() === '')) {
+        onChange({ ...slot, title: `TICKET ${textTicket}` });
+      }
+
+      // Intentamos leer imágenes del portapapeles
       const items = await navigator.clipboard.read();
       for (const item of items) {
         const type = item.types.find(t => t.startsWith('image/'));
@@ -80,6 +140,14 @@ const ImageSlot = React.memo(({ slot, onChange, onDelete }) => {
   const handleInputPaste = (e) => {
     const items = e.clipboardData?.items;
     if (!items) return;
+
+    // Intentar extraer texto que contenga ticket
+    const text = e.clipboardData?.getData('text') || '';
+    const t = text.match(/#\d+/)?.[0];
+    if (t && (!slot.title || slot.title.trim() === '')) {
+      onChange({ ...slot, title: `TICKET ${t}` });
+    }
+
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         const file = items[i].getAsFile();
@@ -119,7 +187,10 @@ const ImageSlot = React.memo(({ slot, onChange, onDelete }) => {
           <TextField
             variant="standard"
             value={slot.title}
-            onChange={(e) => onChange({ ...slot, title: e.target.value })}
+            onChange={(e) => {
+              const newTitle = e.target.value;
+              onChange({ ...slot, title: newTitle });
+            }}
             InputProps={{ disableUnderline: true, style: { fontSize: '0.9rem', fontWeight: 600, color: '#f5f5ff' } }}
             fullWidth sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}
           />
