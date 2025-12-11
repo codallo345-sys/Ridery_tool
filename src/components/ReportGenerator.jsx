@@ -7,12 +7,13 @@ import {
 import { saveAs } from 'file-saver';
 import {
   Container, Button, Grid, Typography, Box, Paper, Chip,
-  List, ListItem, LinearProgress, Snackbar, Alert
+  LinearProgress, Snackbar, Alert
 } from '@mui/material';
 import ImageSlot from './ImageSlot';
 import { processImageForReport } from '../utils/cmcImageProcessor';
 import { getCellTargetDimensions } from '../utils/cmcDimensions';
 import CompactCalculator from './CompactCalculator';
+import RecalculationGuide from './RecalculationGuide';
 import { nanoid } from 'nanoid';
 import AddIcon from '@mui/icons-material/Add';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -23,7 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import pLimit from 'p-limit';
 
 const createNewSlot = (title = 'Evidencia Adicional') => ({
-  id: nanoid(), file: null, title: title, rotation: 0, orientation: 'horizontal', fullWidth: false
+  id: nanoid(), file: null, title: title, rotation: 0, orientation: 'horizontal'
 });
 
 const FONT_SIZE = 18;
@@ -33,9 +34,8 @@ const CONCURRENCY_LIMIT = 3;
 /**
  * generateImageTable
  * - Procesa las imágenes con processImageForReport
- * - Soporta slots con slot.fullWidth === true:
- *     -> esos slots se renderizan en una fila propia que ocupa 100% de ancho (una sola celda)
- * - Para el resto, agrupa en filas con `cols` celdas
+ * - Mantiene el orden recibido en `slots`
+ * - Agrupa en `cols` columnas; completa la última fila con celdas vacías si es necesario
  */
 const generateImageTable = async (slots, cols, docChildren, onProgress) => {
   if (!slots || slots.length === 0) return;
@@ -50,9 +50,6 @@ const generateImageTable = async (slots, cols, docChildren, onProgress) => {
   const processed = await Promise.all(
     slots.map((s) =>
       limit(async () => {
-        // calculamos dimensiones objetivo por celda, permitiendo que se pase targetDims
-        // (si el slot es fullWidth, aún devolvemos dims apropiadas para la inserción,
-        // pero la celda ocupará el 100%)
         const targetDims = getCellTargetDimensions(cols, s.orientation, marginsTwipsLeft, marginsTwipsRight, 1);
         const result = await processImageForReport(s.file, s.rotation, s.orientation, targetDims);
         if (onProgress) onProgress();
@@ -65,57 +62,11 @@ const generateImageTable = async (slots, cols, docChildren, onProgress) => {
   let currentCells = [];
   const cellWidthPercent = 100 / cols;
 
-  // Recorremos processed en orden original y respetamos fullWidth slots.
   for (let i = 0; i < processed.length; i++) {
     const { slot, result } = processed[i];
 
-    // Si el slot solicita ocupar toda la fila, primero flush currentCells (completando con celdas vacías),
-    // luego añadimos una fila con una sola celda que ocupa 100% (WidthType.PERCENTAGE size: 100).
-    if (slot.fullWidth) {
-      // Flush pending cells
-      if (currentCells.length > 0) {
-        // rellenar hasta completar la fila
-        while (currentCells.length < cols) {
-          currentCells.push(new TableCell({
-            children: [],
-            width: { size: cellWidthPercent, type: WidthType.PERCENTAGE },
-            borders: { top: { style: BorderStyle.NIL }, bottom: { style: BorderStyle.NIL }, left: { style: BorderStyle.NIL }, right: { style: BorderStyle.NIL } }
-          }));
-        }
-        rows.push(new TableRow({ children: currentCells }));
-        currentCells = [];
-      }
+    const imageType = (result.mime && result.mime.toLowerCase().includes('png')) ? 'png' : 'jpeg';
 
-      // Crear contenido de la celda full width
-      const cellContent = [
-        new Paragraph({
-          children: [new TextRun({ text: slot.title || 'Evidencia', bold: true, size: FONT_SIZE, font: 'Calibri' })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 50 }
-        }),
-        new Paragraph({
-          children: [new ImageRun({ data: result.buffer, transformation: { width: result.width, height: result.height }, type: 'jpg' })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 100 }
-        })
-      ];
-
-      const fullCell = new TableCell({
-        children: cellContent,
-        width: { size: 100, type: WidthType.PERCENTAGE }, // ocupa 100% de la tabla
-        borders: {
-          top: { style: BorderStyle.SINGLE, size: 4, color: BORDER_COLOR },
-          bottom: { style: BorderStyle.SINGLE, size: 4, color: BORDER_COLOR },
-          left: { style: BorderStyle.SINGLE, size: 4, color: BORDER_COLOR },
-          right: { style: BorderStyle.SINGLE, size: 4, color: BORDER_COLOR }
-        }
-      });
-
-      rows.push(new TableRow({ children: [fullCell] }));
-      continue;
-    }
-
-    // comportamiento normal: celda de una columna
     const cellContent = [
       new Paragraph({
         children: [new TextRun({ text: slot.title || 'Evidencia', bold: true, size: FONT_SIZE, font: 'Calibri' })],
@@ -123,7 +74,7 @@ const generateImageTable = async (slots, cols, docChildren, onProgress) => {
         spacing: { after: 50 }
       }),
       new Paragraph({
-        children: [new ImageRun({ data: result.buffer, transformation: { width: result.width, height: result.height }, type: 'jpg' })],
+        children: [new ImageRun({ data: result.buffer, transformation: { width: result.width, height: result.height }, type: imageType })],
         alignment: AlignmentType.CENTER,
         spacing: { after: 100 }
       })
@@ -148,7 +99,6 @@ const generateImageTable = async (slots, cols, docChildren, onProgress) => {
     }
   }
 
-  // Si sobran celdas parciales al final, completarlas con celdas vacías
   if (currentCells.length > 0) {
     while (currentCells.length < cols) {
       currentCells.push(new TableCell({
@@ -186,6 +136,46 @@ export default function ReportGenerator({ currentOption }) {
     cashGivenAdmin: 0,
     realCashGiven: 0
   });
+
+  // Guía HTML (ajustada: línea larga removida y textos compactos)
+  const guideHtml = `
+    <h2>¿Qué es un recalculo?</h2>
+    <p>Es una incidencia que se realiza cuando hay algún tipo de error con la dirección del viaje — por ejemplo, cliente colocó la dirección mal o el conductor sufrió un accidente y no pudo llegar al destino.</p>
+
+    <h3>¿Qué hay que tener en cuenta?</h3>
+    <p>Debemos tener en cuenta dos puntos principales:</p>
+    <ol>
+      <li>Si es por dirección errónea y el cliente debe pagar más, el cliente debe aprobar y pagar el monto extra antes de crear la incidencia.</li>
+      <li>Si el conductor sufrió un accidente: el viaje debe tener más de 50% de recorrido para permitir recalculo; si es menos, se cancela el viaje.</li>
+    </ol>
+
+    <h3>Dispatcher</h3>
+    <p>Para validar un trip completed selecciona: tipo de flota, dirección de origen y dirección de destino.</p>
+
+    <h3>Calculadora</h3>
+    <p>Se usa para saber si aplica el recalculo. Campos clave:</p>
+    <ul>
+      <li><strong>Amount Admin</strong>: costo según Admin.</li>
+      <li><strong>Amount Real</strong>: fare mostrado en Dispatcher.</li>
+      <li><strong>Surge Real</strong>: surge en Dispatcher.</li>
+      <li><strong>Surge Admin</strong>: surge en Admin (debe ser > 1.00 para usarse).</li>
+    </ul>
+
+    <h3>Página Admin</h3>
+    <p>De aquí sacamos amount admin y surge admin para la calculadora y mapa del viaje.</p>
+  `;
+
+  // Show guide only when option is a recalculation flow (conductor o usuario)
+  const optionName = (currentOption?.name || '').toUpperCase();
+  const showGuide = optionName.includes('RECÁLCULO') || optionName.includes('RECALCULO');
+
+  // images to show in guide: user-supplied images should be placed in public/assets/
+  // Image mapping (upload your images to public/assets with these exact filenames)
+  const guideImages = [
+    { src: '/assets/guide_dispatch.png', alt: 'Dispatcher', width: 380 },   // image 8
+    { src: '/assets/guide_calculator.png', alt: 'Calculadora', width: 300 },// image 9
+    { src: '/assets/guide_admin.png', alt: 'Página Admin', width: 420 }     // image 10
+  ];
 
   useEffect(() => {
     const requiredItems = currentOption?.items || [];
@@ -239,6 +229,7 @@ export default function ReportGenerator({ currentOption }) {
         }));
       }
 
+      // Procesamos en orden: horizontales (3 cols) y verticales (4 cols), manteniendo orden interno
       const horizontalSlots = validSlots.filter(s => s.orientation === 'horizontal');
       const verticalSlots = validSlots.filter(s => s.orientation === 'vertical');
 
@@ -279,7 +270,6 @@ export default function ReportGenerator({ currentOption }) {
   const progressValue = totalToProcess > 0 ? Math.round((processedCount / totalToProcess) * 100) : 0;
 
   // Decide if we should show the calculator and which mode
-  const optionName = currentOption?.name || '';
   const showCalculator = ['VIAJE REALIZADO CASH', 'VIAJE REALIZADO', 'VIAJE YUNO', 'RECÁLCULO', 'CAMBIO DE MONTO CASH (CMC)', 'MOVIMIENTO CERO'].includes(optionName);
   const calculatorMode = optionName === 'VIAJE REALIZADO CASH'
     ? 'cash'
@@ -311,6 +301,15 @@ export default function ReportGenerator({ currentOption }) {
                 </Box>
                 <Typography variant="body2" sx={{ color: '#ffc1e3' }}>{currentOption.warning}</Typography>
               </Paper>
+            )}
+
+            {/* Mostrar guía solo en apartados de recalculo (conductor/usuario) */}
+            {showGuide && (
+              <RecalculationGuide
+                guideHtml={guideHtml}
+                images={guideImages}
+                onEdit={null}
+              />
             )}
 
             {/* Calculator (compact) for supported options */}
