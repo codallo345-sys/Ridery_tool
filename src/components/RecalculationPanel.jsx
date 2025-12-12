@@ -5,16 +5,25 @@ import CompactCalculator from './CompactCalculator';
 
 /**
  * RecalculationPanel
- * - Panel único que se muestra cuando el usuario selecciona la pestaña RECÁLCULO (fuera de Conductor/Usuario).
- * - Este panel NO debe tener opción de generar reportes ni evidencias; solo guía y calculadora.
- * - Recibe isAdmin prop and forwards to RecalculationGuide to control edit visibility.
+ * - Panel top-level para RECÁLCULO (guía única editable por admin)
+ * Props:
+ * - guideHtml: content string for RECÁLCULO_PANEL
+ * - onSaveGuide: function(guideKey, html)
+ * - isAdmin: boolean
  */
 export default function RecalculationPanel({ guideHtml = '', onSaveGuide = null, isAdmin = false }) {
+  const PANEL_KEY = 'RECÁLCULO_PANEL';
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="h6" sx={{ color: '#87fcd9', fontWeight: 900 }}>Recalculo (Panel)</Typography>
 
-      <RecalculationGuide guideHtml={guideHtml} onSave={onSaveGuide} optionKey={'RECÁLCULO'} isAdmin={isAdmin} />
+      <RecalculationGuide
+        guideKey={PANEL_KEY}
+        title="Guía del Panel de Recalculo"
+        content={guideHtml}
+        isAdmin={isAdmin}
+        onSave={onSaveGuide}
+      />
 
       <CompactCalculator mode="recalculo" values={{}} onChange={() => {}} />
 

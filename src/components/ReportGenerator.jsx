@@ -1,5 +1,5 @@
 // src/components/ReportGenerator.jsx
-// ReportGenerator completo - con detección y propagación del estado de admin (isAdmin)
+// ReportGenerator completo — restauré las guías por defecto y uso guideMap (Firestore o local fallback).
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Document, Packer, Paragraph, ImageRun, TextRun, AlignmentType,
@@ -8,7 +8,7 @@ import {
 import { saveAs } from 'file-saver';
 import {
   Container, Button, Grid, Typography, Box, Paper, Chip,
-  LinearProgress, Snackbar, Alert
+  LinearProgress, Snackbar, Alert, Tabs, Tab
 } from '@mui/material';
 import ImageSlot from './ImageSlot';
 import { processImageForReport } from '../utils/cmcImageProcessor';
@@ -26,6 +26,20 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { motion, AnimatePresence } from 'framer-motion';
 import pLimit from 'p-limit';
 
+// si tienes firestore instalado y firebaseClient exporta subscribeToGuides/saveGuide, lo usamos; si no, fallback a localStorage
+let subscribeToGuides = null;
+let saveGuideToStore = null;
+try {
+  // eslint-disable-next-line import/no-unresolved, global-require
+  const fb = require('../firebase/firebaseClient');
+  subscribeToGuides = fb.subscribeToGuides;
+  saveGuideToStore = fb.saveGuide;
+} catch (e) {
+  // no Firebase, seguiremos con localStorage fallback
+  subscribeToGuides = null;
+  saveGuideToStore = null;
+}
+
 const createNewSlot = (title = 'Evidencia Adicional') => ({
   id: nanoid(), file: null, title: title, rotation: 0, orientation: 'horizontal', size: 'normal'
 });
@@ -34,23 +48,88 @@ const FONT_SIZE = 18;
 const BORDER_COLOR = 'E0E0E0';
 const CONCURRENCY_LIMIT = 3;
 
-/**
- * generateImageTableForGroup
- * - slots: array de slots que comparten orientation y tamaño (size)
- * - cols: número de columnas que queremos usar (3,2,1)
- * - docChildren: array donde empujamos la tabla
- * - onProgress: callback opcional
- */
+// --- Guías por defecto (restauradas) ---
+// Incluyo las guías principales para cada incidencia que mencionaste.
+// Puedes editar estos textos o pedirme ampliarlos.
+const DEFAULT_GUIDES = {
+  "CAMBIO DE MONTO CASH (CMC)": `Cambio de Monto CASH (CMC)
+Descripción:
+Se usa para corregir errores relacionados con cobros en efectivo. Adjunta ticket y evidencia del cobro. 
+Pasos:
+1) Verificar ticket.
+2) Obtener captura de la transacción o fotografía del recibo.
+3) Aplicar ajuste en Admin y registrar evidencia.`,
+
+  "VIAJE REALIZADO": `Incidencia: Viaje Realizado
+Descripción:
+Se crea cuando el servicio fue prestado pero existen errores en el cobro/estado. 
+Pasos:
+- Revisar historial del viaje.
+- Verificar comunicaciones con el rider.
+- Registrar evidencias: ticket, viaje admin, mapa.`,
+
+  "VIAJE REALIZADO CASH": `Incidencia: Viaje Realizado (CASH)
+Descripción:
+Usada cuando el viaje fue pagado en efectivo y no queda registrado correctamente.
+Pasos:
+- Verificar comprobante/ticket del conductor.
+- Validar monto recibido.
+- Aplicar abono o ajuste si corresponde.`,
+
+  "RECÁLCULO": `Recalculo (Incidencia)
+Descripción:
+Se realiza cuando hay diferencias entre amount admin y amount real o problemas con surge.
+Campos a considerar:
+- Amount Admin: costo según Admin.
+- Amount Real: fare mostrado en Dispatcher.
+- Surge Real y Surge Admin.
+Usar calculadora para validar si aplica recalculo.`,
+
+  "MOVIMIENTO CERO": `Incidencia: Movimiento Cero
+Descripción:
+Se tramita cuando se detecta que el conductor reportó un cobro en efectivo inexistente ($0).
+Pasos:
+- Revisar evidencia y conversación.
+- Si procede, anular el movimiento y notificar al conductor.`,
+
+  "VIAJE YUNO": `Viaje YUNO
+Descripción:
+Incidencia asociada a pagos a través de la pasarela YUNO. Verifica estado del cobro y conciliación.`,
+
+  "ABONO CXC DISPUTA MAL LIBERADA": `Abono CXC - Disputa mal liberada
+Descripción:
+Uso cuando una disputa fue liberada erróneamente y produjo un abono inadecuado. Adjuntar evidencia.`,
+
+  "ABONO CXC PAGO MÓVIL": `Abono CXC (Pago Móvil)
+Descripción:
+Incidencia para pagos móviles registrados incorrectamente. Requiere captura del pago, banco, teléfono y referencia.`,
+
+  // Guías adicionales que suelen aparecer (usuario side)
+  "CAMBIO DE MONTO CASH (CMC)_USUARIO": `Cambio de Monto CASH (USUARIO)
+Descripción:
+Asunto similar a CMC conductor pero desde perspectiva usuario. Adjuntar evidencia de pago y ticket.`,
+
+  "RECÁLCULO_PANEL": `Guía del Panel de Recalculo
+Esta guía es la guía exclusiva del panel top-level de recalculo. Solo administradores pueden editarla.
+Uso:
+- Revisar la calculadora.
+- Revisar las evidencias y mapa.
+- Decidir si aplica recalculo y el monto a ajustar.`,
+
+  // Mensajes por defecto si no hay guía específica
+  "DEFAULT": `No hay guía específica para esta incidencia. Si eres administrador, puedes agregar una guía detallada para este caso.`
+};
+
+// --- funciones para generar tablas de imágenes (.docx) ---
 const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) => {
   if (!slots || slots.length === 0) return;
   const limit = pLimit(CONCURRENCY_LIMIT);
 
-  // Procesar cada imagen (con concurrencia)
   const processed = await Promise.all(
     slots.map((s) =>
       limit(async () => {
         const dims = getDimensionsFor(s.size || 'normal', s.orientation || 'horizontal', 1);
-        const targetDims = { width: dims.width, height: dims.height }; // px para processImageForReport
+        const targetDims = { width: dims.width, height: dims.height };
         const result = await processImageForReport(s.file, s.rotation || 0, s.orientation || 'horizontal', targetDims);
         if (onProgress) onProgress();
         return { slot: s, result, dims };
@@ -63,7 +142,6 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
   const rows = [];
   let currentCells = [];
 
-  // Derivamos ancho célula (twips) a partir del first processed dims.widthCm
   const firstWidthCm = processed[0]?.dims?.widthCm || 10;
   const cellWidthTwips = Math.round(firstWidthCm * CM_TO_TWIPS);
   const tableWidthTwips = cellWidthTwips * cols;
@@ -120,10 +198,10 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
   });
 
   docChildren.push(imageTable);
-  // pequeño espaciado para separar grupos
   docChildren.push(new Paragraph({ text: '', spacing: { after: 80 } }));
 };
 
+// ------------------ componente principal ------------------
 export default function ReportGenerator({ currentOption }) {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -134,57 +212,40 @@ export default function ReportGenerator({ currentOption }) {
   const [snackOpen, setSnackOpen] = useState(false);
 
   const [calcState, setCalcState] = useState({
-    amountAdmin: 0,
-    cashGiven: 0,
-    amountReal: 0,
-    surgeAdmin: 1,
-    surgeReal: 1,
-    surgeType: 'none',
-    cashGivenAdmin: 0,
-    realCashGiven: 0
+    amountAdmin: 0, cashGiven: 0, amountReal: 0, surgeAdmin: 1, surgeReal: 1, surgeType: 'none', cashGivenAdmin: 0, realCashGiven: 0
   });
 
-  // 1. Detección y manejo del estado de administrador (isAdmin)
-  const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('cmc_is_admin'));
-  useEffect(() => {
-    const onStorage = () => setIsAdmin(!!localStorage.getItem('cmc_is_admin'));
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
-  // Fin de Detección Admin
-
-  // Guías por defecto (simplificadas). Se pueden editar en UI.
-  const defaultGuides = {
-    "CAMBIO DE MONTO CASH": `
-      <h2>Cambio de Monto Cash</h2>
-      <p>Se utiliza para corregir un error de validación del efectivo. Permite ajustar el monto que la aplicación descontará cuando el efectivo recibido no coincide con el monto que se registró en la app (generalmente porque se validó un monto mayor al real).</p>
-      <p>Adicionalmente, se usa si el conductor realizó un cobro adicional por fuera de la app que debe ser descontado (casos comunes).</p>
-    `,
-    "INCIDENCIA VIAJE REALIZADO CASH": `
-      <h2>Incidencia Viaje Realizado Cash</h2>
-      <p>Se usa cuando, por diferentes razones, el viaje está en estatus <strong>cancelled</strong> pero el servicio sí se prestó y se pagó en efectivo. IMPORTANTE: un viaje cancelado hecho en efectivo jamás se puede revivir.</p>
-    `,
-    "INCIDENCIA MOVIMIENTO CERO": `
-      <h2>Incidencia Movimiento Cero</h2>
-      <p>Se realiza cuando el conductor valida que recibió efectivo, pero en realidad no recibió nada ($0). Esta incidencia anula el cobro al conductor.</p>
-    `,
-    "INCIDENCIA VIAJE REALIZADO": `
-      <h2>Incidencia Viaje Realizado</h2>
-      <p>Se crea cuando, por algún motivo, el viaje no se puede revivir (promocode, error admin, etc.).</p>
-    `,
-    "VIAJE YUNO": `<h2>Viajes Pago YUNO</h2><p>Incidencias por cobros no generados en YUNO.</p>`,
-    "ABONO CXC PAGO MÓVIL": `<h2>Abono CXC (Pago móvil)</h2><p>Incidencia para pagos móviles abonados incorrectamente.</p>`
-  };
-
   const [guideMap, setGuideMap] = useState(() => {
+    // try Firestore loaded via subscribeToGuides later; meanwhile attempt localStorage fallback
     try {
-      const saved = JSON.parse(localStorage.getItem('cmc_guides') || '{}');
-      return { ...defaultGuides, ...saved };
+      const stored = JSON.parse(localStorage.getItem('cmc_guides') || '{}');
+      return { ...DEFAULT_GUIDES, ...stored };
     } catch (e) {
-      return { ...defaultGuides };
+      return { ...DEFAULT_GUIDES };
     }
   });
 
+  const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('cmc_is_admin'));
+
+  // subscribe to Firestore guides if available
+  useEffect(() => {
+    let unsub = null;
+    if (typeof subscribeToGuides === 'function') {
+      try {
+        unsub = subscribeToGuides((map) => {
+          // map contains fields saved in master_guides document
+          setGuideMap(prev => ({ ...DEFAULT_GUIDES, ...prev, ...map }));
+          // also mirror into localStorage for fallback
+          try { localStorage.setItem('cmc_guides', JSON.stringify(map)); } catch (e) {}
+        });
+      } catch (e) {
+        console.warn('subscribeToGuides failed', e);
+      }
+    }
+    return () => { if (unsub) unsub(); };
+  }, []);
+
+  // when currentOption changes, reset slots and calc
   useEffect(() => {
     const requiredItems = currentOption?.items || [];
     let initialSlots = requiredItems.map(itemTitle => createNewSlot(itemTitle));
@@ -192,33 +253,33 @@ export default function ReportGenerator({ currentOption }) {
     setSlots(initialSlots);
     setSnackOpen(false);
     setCalcState({
-      amountAdmin: 0,
-      cashGiven: 0,
-      amountReal: 0,
-      surgeAdmin: 1,
-      surgeReal: 1,
-      surgeType: 'none',
-      cashGivenAdmin: 0,
-      realCashGiven: 0
+      amountAdmin: 0, cashGiven: 0, amountReal: 0, surgeAdmin: 1, surgeReal: 1, surgeType: 'none', cashGivenAdmin: 0, realCashGiven: 0
     });
+    // listen storage changes for admin flag
+    const onStorage = () => setIsAdmin(!!localStorage.getItem('cmc_is_admin'));
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [currentOption]);
 
-  const saveGuidesToStorage = (newMap) => {
+  const handleGuideSave = async (optionKey, newHtml) => {
+    // guardamos en Firestore si existe saveGuideToStore, sino en localStorage
+    if (!localStorage.getItem('cmc_is_admin')) { alert('Solo admin puede guardar guías.'); return; }
     try {
-      localStorage.setItem('cmc_guides', JSON.stringify(newMap));
+      if (typeof saveGuideToStore === 'function') {
+        await saveGuideToStore(optionKey, newHtml);
+      } else {
+        const stored = JSON.parse(localStorage.getItem('cmc_guides') || '{}');
+        stored[optionKey] = newHtml;
+        localStorage.setItem('cmc_guides', JSON.stringify(stored));
+        setGuideMap(prev => ({ ...prev, [optionKey]: newHtml }));
+      }
     } catch (e) {
-      console.warn('No se pudo guardar guías en localStorage', e);
+      console.error(e);
+      alert('Error guardando guía.');
     }
   };
 
-  const handleGuideSave = (optionKey, newHtml) => {
-    setGuideMap(prev => {
-      const next = { ...prev, [optionKey]: newHtml };
-      saveGuidesToStorage(next);
-      return next;
-    });
-  };
-
+  // slot handlers
   const handleAddSlot = useCallback(() => setSlots(prev => [...prev, createNewSlot('Nueva Evidencia')]), []);
   const handleSlotChange = useCallback((u) => setSlots(p => p.map(s => s.id === u.id ? { ...u } : s)), []);
   const handleSlotDelete = useCallback((id) => {
@@ -228,7 +289,6 @@ export default function ReportGenerator({ currentOption }) {
     });
   }, []);
 
-  // Extrae ticket desde slots (title o file.name)
   const extractTicketFromSlots = (slotList) => {
     const ticketRegex = /#\d+/;
     for (const s of slotList) {
@@ -255,14 +315,12 @@ export default function ReportGenerator({ currentOption }) {
     try {
       const docChildren = [];
 
-      // Título central
       docChildren.push(new Paragraph({
         children: [new TextRun({ text: 'REPORTE CMC', bold: true, size: 28, font: 'Calibri' })],
         alignment: AlignmentType.CENTER,
         spacing: { after: 80 }
       }));
 
-      // Caso y ticket
       if (currentOption) {
         docChildren.push(new Paragraph({
           children: [new TextRun({ text: `CASO: ${currentOption.name}`, bold: true, size: 24, font: 'Calibri' })],
@@ -277,9 +335,8 @@ export default function ReportGenerator({ currentOption }) {
         }
       }
 
-      // Agrupar por orientación y tamaño
-      const horizontalSlots = validSlots.filter(s => (s.orientation || 'horizontal') === 'horizontal');
-      const verticalSlots = validSlots.filter(s => (s.orientation || 'horizontal') === 'vertical');
+      const horizontalSlots = validSlots.filter(s => s.orientation === 'horizontal');
+      const verticalSlots = validSlots.filter(s => s.orientation === 'vertical');
 
       const groupAndProcess = async (arr, onProgress) => {
         const bySize = { normal: [], mediana: [], grande: [] };
@@ -306,7 +363,6 @@ export default function ReportGenerator({ currentOption }) {
 
       const blob = await Packer.toBlob(doc);
       saveAs(blob, `Reporte_CMC_${Date.now()}.docx`);
-
       setSnackOpen(true);
     } catch (error) {
       console.error(error);
@@ -320,20 +376,30 @@ export default function ReportGenerator({ currentOption }) {
 
   const progressValue = totalToProcess > 0 ? Math.round((processedCount / totalToProcess) * 100) : 0;
 
-  // Detectar panels top-level
   const currentCategory = currentOption?.category || '';
   const isRecalculoPanel = currentCategory === 'RECALCULO';
   const isCategoryPanel = currentCategory === 'CATEGORIAS';
 
   const optionName = (currentOption?.name || '').toUpperCase();
-  const showCalculator = ['VIAJE REALIZADO CASH', 'VIAJE REALIZADO', 'VIAJE YUNO', 'RECÁLCULO', 'RECALCULO', 'CAMBIO DE MONTO CASH (CMC)', 'MOVIMIENTO CERO'].includes(optionName);
-  const calculatorMode = optionName === 'VIAJE REALIZADO CASH'
-    ? 'cash'
-    : (optionName === 'RECÁLCULO' || optionName === 'RECALCULO' ? 'recalculo' : (optionName === 'CAMBIO DE MONTO CASH (CMC)' ? 'cambio' : (optionName === 'MOVIMIENTO CERO' ? 'mvzero' : 'noncash')));
+  const showCalculator = ['VIAJE REALIZADO CASH','VIAJE REALIZADO','VIAJE YUNO','RECÁLCULO','RECALCULO','CAMBIO DE MONTO CASH (CMC)','MOVIMIENTO CERO'].includes(optionName);
+  const calculatorMode = optionName === 'VIAJE REALIZADO CASH' ? 'cash' : (optionName === 'RECÁLCULO' || optionName === 'RECALCULO' ? 'recalculo' : (optionName === 'CAMBIO DE MONTO CASH (CMC)' ? 'cambio' : (optionName === 'MOVIMIENTO CERO' ? 'mvzero' : 'noncash')));
 
-  // lookup guide
-  const guideKey = Object.keys(guideMap).find(k => optionName.includes(k.toUpperCase())) || null;
-  const guideHtml = guideKey ? guideMap[guideKey] : '';
+  // pick guide: look for exact currentOption.name first, otherwise try to match keys by inclusion
+  const pickGuideHtml = () => {
+    if (!currentOption) return DEFAULT_GUIDES.DEFAULT;
+    const name = currentOption.name;
+    // exact match
+    if (guideMap[name]) return guideMap[name];
+    if (DEFAULT_GUIDES[name]) return DEFAULT_GUIDES[name];
+    // try to find a guide whose key is included in name
+    const foundKey = Object.keys(guideMap).find(k => k && name.toUpperCase().includes(k.toUpperCase()));
+    if (foundKey) return guideMap[foundKey];
+    const foundDefaultKey = Object.keys(DEFAULT_GUIDES).find(k => k && name.toUpperCase().includes(k.toUpperCase()));
+    if (foundDefaultKey) return DEFAULT_GUIDES[foundDefaultKey];
+    return DEFAULT_GUIDES.DEFAULT;
+  };
+
+  const guideHtml = pickGuideHtml();
 
   return (
     <Container maxWidth="xl" sx={{ pb: 15 }}>
@@ -362,40 +428,18 @@ export default function ReportGenerator({ currentOption }) {
               </Paper>
             )}
 
-            {/* Paneles especiales - IMPORTANTE: Se propaga el estado isAdmin */}
             {isRecalculoPanel ? (
-              <RecalculationPanel 
-                guideHtml={guideMap['RECÁLCULO'] || guideMap['RECALCULO'] || ''} 
-                onSaveGuide={handleGuideSave} 
-                isAdmin={isAdmin} // <-- Propagado
-              />
+              <RecalculationPanel guideHtml={guideMap['RECÁLCULO_PANEL'] || DEFAULT_GUIDES['RECÁLCULO_PANEL']} onSaveGuide={handleGuideSave} isAdmin={isAdmin} />
             ) : isCategoryPanel ? (
-              <CategoryPanel 
-                currentOptionName={currentOption?.name || ''} 
-                onSave={handleGuideSave} 
-                isAdmin={isAdmin} // <-- Propagado
-              />
+              <CategoryPanel currentOptionName={currentOption?.name || ''} onSave={handleGuideSave} />
             ) : (
-              guideKey && (
-                <RecalculationGuide 
-                  guideHtml={guideHtml} 
-                  onSave={handleGuideSave} 
-                  optionKey={guideKey} 
-                  isAdmin={isAdmin} // <-- Propagado
-                />
-              )
+              <RecalculationGuide guideKey={currentOption?.name || 'GUIDE'} title={currentOption?.name || 'Guía'} content={guideHtml} isAdmin={isAdmin} onSave={handleGuideSave} />
             )}
 
-            {/* Calculadora para incidencias normales (no para paneles top-level) */}
             {!isRecalculoPanel && !isCategoryPanel && showCalculator && (
-              <CompactCalculator
-                mode={calculatorMode}
-                values={calcState}
-                onChange={(partial) => setCalcState(s => ({ ...s, ...partial }))}
-              />
+              <CompactCalculator mode={calculatorMode} values={calcState} onChange={(partial) => setCalcState(s => ({ ...s, ...partial }))} />
             )}
 
-            {/* REQUISITOS: solo mostrar para incidencias normales (no en RECALCULO panel) */}
             {!isRecalculoPanel && currentOption?.items && (
               <Paper sx={{ p: 2, bgcolor: 'rgba(20, 20, 40, 0.6)', border: '1px solid rgba(135, 252, 217, 0.2)', borderRadius: '16px' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
@@ -412,7 +456,6 @@ export default function ReportGenerator({ currentOption }) {
           </Box>
         </Grid>
 
-        {/* RIGHT: evidencias / área de carga. Si estamos en RECALCULO o CATEGORIAS ocultamos esta área */}
         {!isRecalculoPanel && !isCategoryPanel ? (
           <Grid item xs={12} lg={8}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'center' }}>
@@ -451,26 +494,11 @@ export default function ReportGenerator({ currentOption }) {
         )}
       </Grid>
 
-      {/* Bottom action bar (Añadir extra / Descargar reporte) - oculto en RECALCULO y CATEGORIAS */}
       {!isRecalculoPanel && !isCategoryPanel && (
-        <Paper
-          elevation={24}
-          sx={{
-            position: 'fixed',
-            bottom: 30,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1300,
-            p: 1,
-            borderRadius: '50px',
-            display: 'flex',
-            gap: 2,
-            bgcolor: 'rgba(26, 26, 46, 0.95)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid #87fcd9',
-            boxShadow: '0 0 20px rgba(135, 252, 217, 0.2)'
-          }}
-        >
+        <Paper elevation={24} sx={{
+          position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)', zIndex: 1300, p: 1, borderRadius: '50px',
+          display: 'flex', gap: 2, bgcolor: 'rgba(26, 26, 46, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid #87fcd9'
+        }}>
           <Button variant="text" startIcon={<AddIcon />} onClick={handleAddSlot} sx={{ color: '#87fcd9', px: 3, borderRadius: '30px', fontWeight: 'bold' }}>
             Añadir Extra
           </Button>
