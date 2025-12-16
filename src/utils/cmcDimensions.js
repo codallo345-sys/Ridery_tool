@@ -13,15 +13,15 @@ export const CM_TO_PIXELS = 37.7952755906; // aproximado: px por cm para canvas
 export const CM_TO_TWIPS = 1440 / 2.54;   // twips por cm (1in=1440 twips, 1in=2.54cm)
 
 export const HORIZONTAL_SIZES_CM = {
-  normal: { width: 11.0, height: 5.56 },
-  mediana: { width: 8.11, height: 3.96 },
-  grande: { width: 15.7, height: 4.46 }
+  normal: { width: 14.82, height: 8.33 },   // ~560px width (480-640px range)
+  mediana: { width: 24.13, height: 13.57 }, // ~912px width (800-1024px range)
+  grande: { width: 37.04, height: 20.84 }   // ~1400px width (1200-1600px range)
 };
 
 export const VERTICAL_SIZES_CM = {
-  normal: { width: 2.97, height: 6.17 },
-  mediana: { width: 3.5, height: 7.86 },
-  grande: { width: 4.96, height: 11.15 }
+  normal: { width: 8.33, height: 14.82 },   // Portrait orientation of small
+  mediana: { width: 13.57, height: 24.13 }, // Portrait orientation of medium
+  grande: { width: 20.84, height: 37.04 }   // Portrait orientation of large
 };
 
 /**
