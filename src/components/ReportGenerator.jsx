@@ -129,13 +129,22 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
   const rows = [];
   let currentCells = [];
 
-  const firstWidthCm = processed[0]?.dims?.widthCm || 10;
-  const cellWidthTwips = Math.round(firstWidthCm * CM_TO_TWIPS);
+  // Calculate proper cell width for the table to fit within A4 page margins
+  // A4 width = 21cm, with 2cm margins on each side = 17cm usable width
+  const usableWidthCm = 17.0;
+  const cellWidthCm = usableWidthCm / cols;
+  const cellWidthTwips = Math.round(cellWidthCm * CM_TO_TWIPS);
   const tableWidthTwips = cellWidthTwips * cols;
 
   for (let i = 0; i < processed.length; i++) {
-    const { slot, result } = processed[i];
+    const { slot, result, dims } = processed[i];
     const imageType = (result.mime && result.mime.toLowerCase().includes('png')) ? 'png' : 'jpeg';
+
+    // Calculate image dimensions to fit within cell while maintaining aspect ratio
+    const maxImageWidthCm = cellWidthCm - 0.5; // 0.5cm padding
+    const maxImageHeightCm = dims.heightCm;
+    const imageWidthTwips = Math.round(maxImageWidthCm * CM_TO_TWIPS);
+    const imageHeightTwips = Math.round(maxImageHeightCm * CM_TO_TWIPS);
 
     const titleParagraph = new Paragraph({
       children: [new TextRun({ text: slot.title || 'Evidencia', bold: true, size: FONT_SIZE, font: 'Calibri' })],
@@ -144,7 +153,11 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
     });
 
     const imageParagraph = new Paragraph({
-      children: [new ImageRun({ data: result.buffer, transformation: { width: result.width, height: result.height }, type: imageType })],
+      children: [new ImageRun({ 
+        data: result.buffer, 
+        transformation: { width: imageWidthTwips, height: imageHeightTwips }, 
+        type: imageType 
+      })],
       alignment: AlignmentType.CENTER,
       spacing: { after: 80 }
     });
@@ -455,7 +468,7 @@ export default function ReportGenerator({ currentOption }) {
             {isRecalculoPanel ? (
               <Paper sx={{
                 p: 2.5,
-                bgcolor: 'rgba(15,23,42,0.6)',
+                bgcolor: 'transparent',
                 border: '1px solid rgba(135,252,217,0.15)',
                 borderRadius: '14px',
                 boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
@@ -468,7 +481,7 @@ export default function ReportGenerator({ currentOption }) {
             ) : isCategoryPanel ? (
               <Paper sx={{
                 p: 2.5,
-                bgcolor: 'rgba(15,23,42,0.6)',
+                bgcolor: 'transparent',
                 border: '1px solid rgba(135,252,217,0.15)',
                 borderRadius: '14px',
                 boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
@@ -478,7 +491,7 @@ export default function ReportGenerator({ currentOption }) {
             ) : (
               <Paper sx={{
                 p: 2.5,
-                bgcolor: 'rgba(15,23,42,0.6)',
+                bgcolor: 'transparent',
                 border: '1px solid rgba(135,252,217,0.15)',
                 borderRadius: '14px',
                 boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
@@ -490,7 +503,7 @@ export default function ReportGenerator({ currentOption }) {
             {!isRecalculoPanel && !isCategoryPanel && showCalculator && (
               <Paper sx={{
                 p: 2,
-                bgcolor: 'rgba(20, 20, 40, 0.6)',
+                bgcolor: 'transparent',
                 border: '1px solid rgba(135, 252, 217, 0.2)',
                 borderRadius: '16px',
                 boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
@@ -502,7 +515,7 @@ export default function ReportGenerator({ currentOption }) {
             {!isRecalculoPanel && currentOption?.items && (
               <Paper sx={{
                 p: 2,
-                bgcolor: 'rgba(20, 20, 40, 0.6)',
+                bgcolor: 'transparent',
                 border: '1px solid rgba(135, 252, 217, 0.2)',
                 borderRadius: '16px',
                 boxShadow: '0 20px 60px rgba(0,0,0,0.35)'

@@ -13,15 +13,15 @@ export const CM_TO_PIXELS = 37.7952755906; // aproximado: px por cm para canvas
 export const CM_TO_TWIPS = 1440 / 2.54;   // twips por cm (1in=1440 twips, 1in=2.54cm)
 
 export const HORIZONTAL_SIZES_CM = {
-  normal: { width: 11.0, height: 5.56 },
-  mediana: { width: 8.11, height: 3.96 },
-  grande: { width: 15.7, height: 4.46 }
+  normal: { width: 5.5, height: 4.0 },   // 3 per row: ~6cm each with margins
+  mediana: { width: 8.5, height: 6.0 },  // 2 per row: ~9.5cm each with margins
+  grande: { width: 18.0, height: 10.0 }  // 1 per row: full width
 };
 
 export const VERTICAL_SIZES_CM = {
-  normal: { width: 2.97, height: 6.17 },
-  mediana: { width: 3.5, height: 7.86 },
-  grande: { width: 4.96, height: 11.15 }
+  normal: { width: 3.5, height: 7.0 },   // 3-4 per row
+  mediana: { width: 5.0, height: 10.0 }, // 2-3 per row
+  grande: { width: 8.0, height: 16.0 }   // 1-2 per row
 };
 
 /**

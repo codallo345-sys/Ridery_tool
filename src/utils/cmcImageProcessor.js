@@ -36,9 +36,11 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const canvas = document.createElement('canvas');
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: false });
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Fill white background for better quality
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const srcWidth = img.width || img.naturalWidth || targetWidth;
   const srcHeight = img.height || img.naturalHeight || targetHeight;
@@ -47,6 +49,10 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const drawH = Math.round(srcHeight * scale);
   const dx = Math.round((canvasWidth - drawW) / 2);
   const dy = Math.round((canvasHeight - drawH) / 2);
+
+  // Enable image smoothing for better quality
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
   if (rot !== 0) {
     ctx.save();
@@ -58,9 +64,9 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     ctx.drawImage(img, dx, dy, drawW, drawH);
   }
 
-  // Prefer PNG for quality/consistency
-  const mime = 'image/png';
-  const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime));
+  // Use JPEG with high quality (0.95) for better file size/quality balance
+  const mime = 'image/jpeg';
+  const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime, 0.95));
   const arrayBuffer = await blob.arrayBuffer();
 
   return {

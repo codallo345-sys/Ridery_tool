@@ -4,7 +4,7 @@ import { Box, keyframes } from '@mui/material';
 
 // Configuration constants
 const CHRISTMAS_END_DATE = '2026-01-01T00:00:00';
-const SNOWFLAKE_COUNT = 20; // Reduced from 30 for better performance
+const SNOWFLAKE_COUNT = 8; // Reduced for less clutter
 const DECORATIONS_Z_INDEX = 1000; // Reduced from 9999 to avoid conflicts with modals
 
 const snowfall = keyframes`
@@ -125,13 +125,13 @@ const ChristmasDecorations = () => {
         🦌
       </Box>
 
-      {/* Gift boxes scattered */}
+      {/* Gift boxes - repositioned to top corners, smaller size */}
       <Box
         sx={{
           position: 'absolute',
-          bottom: '100px',
-          left: '15%',
-          fontSize: '32px',
+          top: '60px',
+          left: '10%',
+          fontSize: '24px',
           animation: `${twinkle} 3s ease-in-out infinite`,
         }}
       >
@@ -141,42 +141,14 @@ const ChristmasDecorations = () => {
       <Box
         sx={{
           position: 'absolute',
-          bottom: '80px',
-          right: '25%',
-          fontSize: '28px',
+          top: '60px',
+          right: '10%',
+          fontSize: '24px',
           animation: `${twinkle} 2.5s ease-in-out infinite`,
           animationDelay: '0.5s',
         }}
       >
         🎁
-      </Box>
-
-      {/* Candy canes */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '5%',
-          fontSize: '36px',
-          animation: `${swing} 5s ease-in-out infinite`,
-          transformOrigin: 'bottom center',
-        }}
-      >
-        🍭
-      </Box>
-
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '40%',
-          right: '8%',
-          fontSize: '36px',
-          animation: `${swing} 4.5s ease-in-out infinite`,
-          animationDelay: '1s',
-          transformOrigin: 'bottom center',
-        }}
-      >
-        🍭
       </Box>
     </Box>
   );
