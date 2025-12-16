@@ -4,6 +4,7 @@ import { Box, Typography, Chip, IconButton, Dialog, DialogTitle, DialogContent, 
 import Sidebar from './components/Sidebar';
 import ReportGenerator from './components/ReportGenerator';
 import FirestoreDemo from './components/FirestoreDemo';
+import ChristmasDecorations from './components/ChristmasDecorations';
 import { CMC_STRUCTURE } from './data/cmcData';
 import BoltIcon from '@mui/icons-material/Bolt';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -42,7 +43,8 @@ export default function App() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar onSelectOption={(opt, cat) => setCurrentOption(getOptionData(opt, cat))} />
+      <ChristmasDecorations />
+      <Sidebar onSelectOption={(opt, cat) => setCurrentOption(getOptionData(opt, cat))} isAdmin={isAdmin} />
 
       <Box component="main" sx={{ flexGrow: 1, p: 4, ml: { md: '280px' } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, pb: 2 }}>
@@ -69,23 +71,25 @@ export default function App() {
         </Box>
 
         {/* Tabs for switching between Reports and Firestore */}
-        <Box sx={{ borderBottom: 1, borderColor: 'rgba(255,255,255,0.1)', mb: 3 }}>
-          <Tabs
-            value={activeTab}
-            onChange={(e, newValue) => setActiveTab(newValue)}
-            sx={{
-              '& .MuiTab-root': { color: 'rgba(255,255,255,0.6)', fontWeight: 600 },
-              '& .Mui-selected': { color: '#87fcd9' },
-              '& .MuiTabs-indicator': { backgroundColor: '#87fcd9' }
-            }}
-          >
-            <Tab icon={<DescriptionIcon />} label="Reports" iconPosition="start" />
-            <Tab icon={<StorageIcon />} label="Firestore Database" iconPosition="start" />
-          </Tabs>
-        </Box>
+        {isAdmin && (
+          <Box sx={{ borderBottom: 1, borderColor: 'rgba(255,255,255,0.1)', mb: 3 }}>
+            <Tabs
+              value={activeTab}
+              onChange={(e, newValue) => setActiveTab(newValue)}
+              sx={{
+                '& .MuiTab-root': { color: 'rgba(255,255,255,0.6)', fontWeight: 600 },
+                '& .Mui-selected': { color: '#87fcd9' },
+                '& .MuiTabs-indicator': { backgroundColor: '#87fcd9' }
+              }}
+            >
+              <Tab icon={<DescriptionIcon />} label="Reports" iconPosition="start" />
+              <Tab icon={<StorageIcon />} label="Firestore Database" iconPosition="start" />
+            </Tabs>
+          </Box>
+        )}
 
         {activeTab === 0 && <ReportGenerator currentOption={currentOption} />}
-        {activeTab === 1 && <FirestoreDemo />}
+        {activeTab === 1 && isAdmin && <FirestoreDemo />}
       </Box>
 
       <Dialog open={openAdminDialog} onClose={handleCloseAdmin}>

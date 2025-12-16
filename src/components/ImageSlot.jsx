@@ -106,7 +106,7 @@ const ImageSlot = React.memo(({ slot, onChange, onDelete }) => {
 
         {ticketMatch && <Typography variant="caption" sx={{ color: '#87fcd9', mb: 1 }}>{ticketMatch[0]}</Typography>}
 
-        <Box sx={{ flexGrow: 1, borderRadius: '12px', mb: 1, border: '2px dashed rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', bgcolor: 'rgba(0,0,0,0.2)' }}>
+        <Box sx={{ flexGrow: 1, borderRadius: '12px', mb: 1, border: '2px dashed rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', bgcolor: 'transparent' }}>
           {previewUrl ? <img src={previewUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `rotate(${slot.rotation}deg)` }} /> : <Box sx={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}><AddPhotoAlternateIcon sx={{ fontSize: 30, mb: 1 }} /><Typography variant="caption" display="block">Arrastra o Pega</Typography></Box>}
         </Box>
 

@@ -9,7 +9,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 const drawerWidth = 280;
 
-export default function Sidebar({ onSelectOption }) {
+export default function Sidebar({ onSelectOption, isAdmin }) {
   // Estado para solucionar el bug de selección doble (usamos Categoría y Opción)
   const [activeSelection, setActiveSelection] = useState({
     category: "CONDUCTOR",
@@ -75,7 +75,13 @@ export default function Sidebar({ onSelectOption }) {
 
         {/* LISTA DE NAVEGACIÓN */}
         <Box sx={{ py: 1 }}>
-          {Object.entries(CMC_STRUCTURE).map(([category, data]) => (
+          {Object.entries(CMC_STRUCTURE).map(([category, data]) => {
+            // Hide CATEGORIAS section if not admin
+            if (category === 'CATEGORIAS' && !isAdmin) {
+              return null;
+            }
+            
+            return (
             <Box key={category} sx={{ mb: 1 }}>
               <Box
                 sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, cursor: 'pointer' }}
@@ -152,7 +158,8 @@ export default function Sidebar({ onSelectOption }) {
 
               <Divider sx={{ bgcolor: 'rgba(255,255,255,0.03)', my: 1 }} />
             </Box>
-          ))}
+            );
+          })}
         </Box>
       </Box>
     </Drawer>
