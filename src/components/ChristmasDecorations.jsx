@@ -2,6 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Box, keyframes } from '@mui/material';
 
+// Configuration constants
+const CHRISTMAS_END_DATE = '2026-01-01T00:00:00';
+const SNOWFLAKE_COUNT = 20; // Reduced from 30 for better performance
+const DECORATIONS_Z_INDEX = 1000; // Reduced from 9999 to avoid conflicts with modals
+
 const snowfall = keyframes`
   0% { transform: translateY(-10px) translateX(0); opacity: 1; }
   100% { transform: translateY(100vh) translateX(50px); opacity: 0.8; }
@@ -21,9 +26,9 @@ const ChristmasDecorations = () => {
   const [shouldShow, setShouldShow] = useState(false);
 
   useEffect(() => {
-    // Check if current date is before January 1, 2026
+    // Check if current date is before the end date
     const now = new Date();
-    const endDate = new Date('2026-01-01T00:00:00');
+    const endDate = new Date(CHRISTMAS_END_DATE);
     setShouldShow(now < endDate);
   }, []);
 
@@ -32,7 +37,7 @@ const ChristmasDecorations = () => {
   }
 
   // Generate random snowflakes
-  const snowflakes = Array.from({ length: 30 }, (_, i) => ({
+  const snowflakes = Array.from({ length: SNOWFLAKE_COUNT }, (_, i) => ({
     id: i,
     left: `${Math.random() * 100}%`,
     animationDelay: `${Math.random() * 5}s`,
@@ -41,7 +46,7 @@ const ChristmasDecorations = () => {
   }));
 
   return (
-    <Box sx={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 9999, overflow: 'hidden' }}>
+    <Box sx={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: DECORATIONS_Z_INDEX, overflow: 'hidden' }}>
       {/* Snowflakes */}
       {snowflakes.map((flake) => (
         <Box
