@@ -15,7 +15,7 @@ export const CM_TO_TWIPS = 1440 / 2.54;   // twips por cm (1in=1440 twips, 1in=2
 export const HORIZONTAL_SIZES_CM = {
   normal: { width: 5.5, height: 4.0 },   // 3 per row: ~6cm each with margins
   mediana: { width: 8.5, height: 6.0 },  // 2 per row: ~9.5cm each with margins
-  grande: { width: 18.0, height: 10.0 }  // 1 per row: full width
+  grande: { width: 16.5, height: 10.0 }  // 1 per row: full width (17cm usable - padding)
 };
 
 export const VERTICAL_SIZES_CM = {

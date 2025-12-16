@@ -36,6 +36,7 @@ const createNewSlot = (title = 'Evidencia Adicional') => ({
 const FONT_SIZE = 18;
 const BORDER_COLOR = 'E0E0E0';
 const CONCURRENCY_LIMIT = 3;
+const CELL_PADDING_CM = 0.5; // Padding within each cell for images
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -141,10 +142,15 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
     const imageType = (result.mime && result.mime.toLowerCase().includes('png')) ? 'png' : 'jpeg';
 
     // Calculate image dimensions to fit within cell while maintaining aspect ratio
-    const maxImageWidthCm = cellWidthCm - 0.5; // 0.5cm padding
-    const maxImageHeightCm = dims.heightCm;
-    const imageWidthTwips = Math.round(maxImageWidthCm * CM_TO_TWIPS);
-    const imageHeightTwips = Math.round(maxImageHeightCm * CM_TO_TWIPS);
+    const maxImageWidthCm = cellWidthCm - CELL_PADDING_CM;
+    const aspectRatio = dims.heightCm / dims.widthCm;
+    
+    // Scale dimensions if needed to fit within cell
+    let imageWidthCm = Math.min(maxImageWidthCm, dims.widthCm);
+    let imageHeightCm = imageWidthCm * aspectRatio;
+    
+    const imageWidthTwips = Math.round(imageWidthCm * CM_TO_TWIPS);
+    const imageHeightTwips = Math.round(imageHeightCm * CM_TO_TWIPS);
 
     const titleParagraph = new Paragraph({
       children: [new TextRun({ text: slot.title || 'Evidencia', bold: true, size: FONT_SIZE, font: 'Calibri' })],
