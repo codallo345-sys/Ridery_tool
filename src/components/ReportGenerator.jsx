@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 // src/components/ReportGenerator.jsx
 // ReportGenerator completo — restauré las guías por defecto y uso guideMap (Firestore o local fallback).
+=======
+// ReportGenerator completo — guías con Firestore y UI refinada (gradientes suaves, chips y cards estilizadas).
+>>>>>>> 262d8b4 (Initial commit)
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Document, Packer, Paragraph, ImageRun, TextRun, AlignmentType,
@@ -26,6 +30,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { motion, AnimatePresence } from 'framer-motion';
 import pLimit from 'p-limit';
 
+<<<<<<< HEAD
 // si tienes firestore instalado y firebaseClient exporta subscribeToGuides/saveGuide, lo usamos; si no, fallback a localStorage
 let subscribeToGuides = null;
 let saveGuideToStore = null;
@@ -39,6 +44,11 @@ try {
   subscribeToGuides = null;
   saveGuideToStore = null;
 }
+=======
+// Firestore helpers
+import { saveGuia, subscribeToGuias } from '../lib/data/guias';
+import { guideNameToSlug } from '../utils/guideSlugMap';
+>>>>>>> 262d8b4 (Initial commit)
 
 const createNewSlot = (title = 'Evidencia Adicional') => ({
   id: nanoid(), file: null, title: title, rotation: 0, orientation: 'horizontal', size: 'normal'
@@ -48,9 +58,13 @@ const FONT_SIZE = 18;
 const BORDER_COLOR = 'E0E0E0';
 const CONCURRENCY_LIMIT = 3;
 
+<<<<<<< HEAD
 // --- Guías por defecto (restauradas) ---
 // Incluyo las guías principales para cada incidencia que mencionaste.
 // Puedes editar estos textos o pedirme ampliarlos.
+=======
+// --- Guías por defecto ---
+>>>>>>> 262d8b4 (Initial commit)
 const DEFAULT_GUIDES = {
   "CAMBIO DE MONTO CASH (CMC)": `Cambio de Monto CASH (CMC)
 Descripción:
@@ -104,7 +118,10 @@ Uso cuando una disputa fue liberada erróneamente y produjo un abono inadecuado.
 Descripción:
 Incidencia para pagos móviles registrados incorrectamente. Requiere captura del pago, banco, teléfono y referencia.`,
 
+<<<<<<< HEAD
   // Guías adicionales que suelen aparecer (usuario side)
+=======
+>>>>>>> 262d8b4 (Initial commit)
   "CAMBIO DE MONTO CASH (CMC)_USUARIO": `Cambio de Monto CASH (USUARIO)
 Descripción:
 Asunto similar a CMC conductor pero desde perspectiva usuario. Adjuntar evidencia de pago y ticket.`,
@@ -116,7 +133,10 @@ Uso:
 - Revisar las evidencias y mapa.
 - Decidir si aplica recalculo y el monto a ajustar.`,
 
+<<<<<<< HEAD
   // Mensajes por defecto si no hay guía específica
+=======
+>>>>>>> 262d8b4 (Initial commit)
   "DEFAULT": `No hay guía específica para esta incidencia. Si eres administrador, puedes agregar una guía detallada para este caso.`
 };
 
@@ -216,7 +236,10 @@ export default function ReportGenerator({ currentOption }) {
   });
 
   const [guideMap, setGuideMap] = useState(() => {
+<<<<<<< HEAD
     // try Firestore loaded via subscribeToGuides later; meanwhile attempt localStorage fallback
+=======
+>>>>>>> 262d8b4 (Initial commit)
     try {
       const stored = JSON.parse(localStorage.getItem('cmc_guides') || '{}');
       return { ...DEFAULT_GUIDES, ...stored };
@@ -227,6 +250,7 @@ export default function ReportGenerator({ currentOption }) {
 
   const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('cmc_is_admin'));
 
+<<<<<<< HEAD
   // subscribe to Firestore guides if available
   useEffect(() => {
     let unsub = null;
@@ -241,6 +265,23 @@ export default function ReportGenerator({ currentOption }) {
       } catch (e) {
         console.warn('subscribeToGuides failed', e);
       }
+=======
+  // Suscripción a Firestore para traer guías y rellenar guideMap
+  useEffect(() => {
+    let unsub = null;
+    try {
+      unsub = subscribeToGuias((docs) => {
+        const map = {};
+        docs.forEach((d) => {
+          const key = d.title || d.slug || '';
+          if (key) map[key] = d.content || '';
+        });
+        setGuideMap((prev) => ({ ...DEFAULT_GUIDES, ...prev, ...map }));
+        try { localStorage.setItem('cmc_guides', JSON.stringify(map)); } catch (e) {}
+      });
+    } catch (e) {
+      console.warn('subscribeToGuides failed', e);
+>>>>>>> 262d8b4 (Initial commit)
     }
     return () => { if (unsub) unsub(); };
   }, []);
@@ -255,12 +296,16 @@ export default function ReportGenerator({ currentOption }) {
     setCalcState({
       amountAdmin: 0, cashGiven: 0, amountReal: 0, surgeAdmin: 1, surgeReal: 1, surgeType: 'none', cashGivenAdmin: 0, realCashGiven: 0
     });
+<<<<<<< HEAD
     // listen storage changes for admin flag
+=======
+>>>>>>> 262d8b4 (Initial commit)
     const onStorage = () => setIsAdmin(!!localStorage.getItem('cmc_is_admin'));
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [currentOption]);
 
+<<<<<<< HEAD
   const handleGuideSave = async (optionKey, newHtml) => {
     // guardamos en Firestore si existe saveGuideToStore, sino en localStorage
     if (!localStorage.getItem('cmc_is_admin')) { alert('Solo admin puede guardar guías.'); return; }
@@ -273,6 +318,25 @@ export default function ReportGenerator({ currentOption }) {
         localStorage.setItem('cmc_guides', JSON.stringify(stored));
         setGuideMap(prev => ({ ...prev, [optionKey]: newHtml }));
       }
+=======
+  // Guardar guía en Firestore por slug fijo
+  const handleGuideSave = async (optionKey, newHtml) => {
+    if (!localStorage.getItem('cmc_is_admin')) { alert('Solo admin puede guardar guías.'); return; }
+    try {
+      const slug = guideNameToSlug(optionKey);
+      await saveGuia(slug, {
+        title: optionKey,
+        content: newHtml,
+        audiences: [],
+        isPublished: true,
+        category: 'incidencias',
+        updatedBy: 'admin',
+      });
+      const stored = JSON.parse(localStorage.getItem('cmc_guides') || '{}');
+      stored[optionKey] = newHtml;
+      localStorage.setItem('cmc_guides', JSON.stringify(stored));
+      setGuideMap(prev => ({ ...prev, [optionKey]: newHtml }));
+>>>>>>> 262d8b4 (Initial commit)
     } catch (e) {
       console.error(e);
       alert('Error guardando guía.');
@@ -388,10 +452,15 @@ export default function ReportGenerator({ currentOption }) {
   const pickGuideHtml = () => {
     if (!currentOption) return DEFAULT_GUIDES.DEFAULT;
     const name = currentOption.name;
+<<<<<<< HEAD
     // exact match
     if (guideMap[name]) return guideMap[name];
     if (DEFAULT_GUIDES[name]) return DEFAULT_GUIDES[name];
     // try to find a guide whose key is included in name
+=======
+    if (guideMap[name]) return guideMap[name];
+    if (DEFAULT_GUIDES[name]) return DEFAULT_GUIDES[name];
+>>>>>>> 262d8b4 (Initial commit)
     const foundKey = Object.keys(guideMap).find(k => k && name.toUpperCase().includes(k.toUpperCase()));
     if (foundKey) return guideMap[foundKey];
     const foundDefaultKey = Object.keys(DEFAULT_GUIDES).find(k => k && name.toUpperCase().includes(k.toUpperCase()));
@@ -402,17 +471,59 @@ export default function ReportGenerator({ currentOption }) {
   const guideHtml = pickGuideHtml();
 
   return (
+<<<<<<< HEAD
     <Container maxWidth="xl" sx={{ pb: 15 }}>
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
           <Typography variant="h4" sx={{ color: 'white', fontWeight: 800 }}>{currentOption?.name}</Typography>
           <Chip label={currentOption?.category} sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: '#87fcd9', fontWeight: 'bold' }} />
+=======
+    <Container
+      maxWidth="xl"
+      sx={{
+        pb: 15,
+        background: 'linear-gradient(135deg, #0f172a, #111827)',
+        minHeight: '100vh',
+        py: 4
+      }}
+    >
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="h4" sx={{ color: 'white', fontWeight: 800, letterSpacing: 0.3 }}>
+            {currentOption?.name}
+          </Typography>
+          <Chip
+            label={currentOption?.category}
+            size="small"
+            sx={{
+              bgcolor: 'rgba(135,252,217,0.12)',
+              color: '#87fcd9',
+              border: '1px solid rgba(135,252,217,0.3)',
+              fontWeight: 700,
+              textTransform: 'uppercase'
+            }}
+          />
+>>>>>>> 262d8b4 (Initial commit)
         </Box>
       </motion.div>
 
       <Snackbar open={snackOpen} autoHideDuration={8000} onClose={() => setSnackOpen(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+<<<<<<< HEAD
         <Alert onClose={() => setSnackOpen(false)} severity="success" sx={{ width: '100%', bgcolor: '#3536ba', color: 'white' }}>
           <strong>✅ Reporte descargado</strong> — Para obtener el mejor PDF: abre el .docx en Word y use Archivo → Exportar para guardar en PDF de alta calidad.
+=======
+        <Alert
+          onClose={() => setSnackOpen(false)}
+          severity="success"
+          sx={{
+            width: '100%',
+            bgcolor: '#1f2937',
+            color: '#c7fcec',
+            border: '1px solid rgba(135,252,217,0.25)'
+          }}
+        >
+          <strong>✅ Reporte descargado</strong> — Para mejor PDF: abre el .docx en Word y usa Exportar → PDF.
+>>>>>>> 262d8b4 (Initial commit)
         </Alert>
       </Snackbar>
 
@@ -420,15 +531,30 @@ export default function ReportGenerator({ currentOption }) {
         <Grid item xs={12} lg={4}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {currentOption?.warning && (
+<<<<<<< HEAD
               <Paper sx={{ bgcolor: 'rgba(255, 55, 117, 0.15)', border: '1px solid #ff3775', p: 2, borderRadius: '16px' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#ff3775', mb: 1 }}>
                   <WarningAmberIcon /><Typography variant="h6">Atención</Typography>
                 </Box>
                 <Typography variant="body2" sx={{ color: '#ffc1e3' }}>{currentOption.warning}</Typography>
+=======
+              <Paper sx={{
+                bgcolor: 'rgba(255, 55, 117, 0.12)',
+                border: '1px solid rgba(255,55,117,0.35)',
+                p: 2.5,
+                borderRadius: '16px',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#ff95b8', mb: 1 }}>
+                  <WarningAmberIcon /><Typography variant="h6" sx={{ fontWeight: 700 }}>Atención</Typography>
+                </Box>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }}>{currentOption.warning}</Typography>
+>>>>>>> 262d8b4 (Initial commit)
               </Paper>
             )}
 
             {isRecalculoPanel ? (
+<<<<<<< HEAD
               <RecalculationPanel guideHtml={guideMap['RECÁLCULO_PANEL'] || DEFAULT_GUIDES['RECÁLCULO_PANEL']} onSaveGuide={handleGuideSave} isAdmin={isAdmin} />
             ) : isCategoryPanel ? (
               <CategoryPanel currentOptionName={currentOption?.name || ''} onSave={handleGuideSave} />
@@ -442,13 +568,84 @@ export default function ReportGenerator({ currentOption }) {
 
             {!isRecalculoPanel && currentOption?.items && (
               <Paper sx={{ p: 2, bgcolor: 'rgba(20, 20, 40, 0.6)', border: '1px solid rgba(135, 252, 217, 0.2)', borderRadius: '16px' }}>
+=======
+              <Paper sx={{
+                p: 2.5,
+                bgcolor: 'rgba(15,23,42,0.6)',
+                border: '1px solid rgba(135,252,217,0.15)',
+                borderRadius: '14px',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
+              }}>
+                <Typography variant="subtitle2" sx={{ color: '#87fcd9', fontWeight: 700, mb: 1 }}>
+                  Guía editable
+                </Typography>
+                <RecalculationPanel guideHtml={guideMap['RECÁLCULO_PANEL'] || DEFAULT_GUIDES['RECÁLCULO_PANEL']} onSaveGuide={handleGuideSave} isAdmin={isAdmin} />
+              </Paper>
+            ) : isCategoryPanel ? (
+              <Paper sx={{
+                p: 2.5,
+                bgcolor: 'rgba(15,23,42,0.6)',
+                border: '1px solid rgba(135,252,217,0.15)',
+                borderRadius: '14px',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
+              }}>
+                <CategoryPanel currentOptionName={currentOption?.name || ''} onSave={handleGuideSave} />
+              </Paper>
+            ) : (
+              <Paper sx={{
+                p: 2.5,
+                bgcolor: 'rgba(15,23,42,0.6)',
+                border: '1px solid rgba(135,252,217,0.15)',
+                borderRadius: '14px',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
+              }}>
+                <RecalculationGuide guideKey={currentOption?.name || 'GUIDE'} title={currentOption?.name || 'Guía'} content={guideHtml} isAdmin={isAdmin} onSave={handleGuideSave} />
+              </Paper>
+            )}
+
+            {!isRecalculoPanel && !isCategoryPanel && showCalculator && (
+              <Paper sx={{
+                p: 2,
+                bgcolor: 'rgba(20, 20, 40, 0.6)',
+                border: '1px solid rgba(135, 252, 217, 0.2)',
+                borderRadius: '16px',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
+              }}>
+                <CompactCalculator mode={calculatorMode} values={calcState} onChange={(partial) => setCalcState(s => ({ ...s, ...partial }))} />
+              </Paper>
+            )}
+
+            {!isRecalculoPanel && currentOption?.items && (
+              <Paper sx={{
+                p: 2,
+                bgcolor: 'rgba(20, 20, 40, 0.6)',
+                border: '1px solid rgba(135, 252, 217, 0.2)',
+                borderRadius: '16px',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.35)'
+              }}>
+>>>>>>> 262d8b4 (Initial commit)
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
                   <AssignmentIcon sx={{ color: '#87fcd9' }} />
                   <Typography variant="subtitle1" sx={{ color: '#87fcd9', fontWeight: 700 }}>REQUISITOS</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                   {currentOption.items.map((item, i) => (
+<<<<<<< HEAD
                     <Chip key={i} icon={<CheckCircleOutlineIcon sx={{ fontSize: '16px !important', color: '#87fcd9 !important' }} />} label={item} variant="outlined" sx={{ color: 'rgba(255,255,255,0.9)' }} />
+=======
+                    <Chip
+                      key={i}
+                      icon={<CheckCircleOutlineIcon sx={{ fontSize: '16px !important', color: '#87fcd9 !important' }} />}
+                      label={item}
+                      variant="outlined"
+                      sx={{
+                        color: 'rgba(255,255,255,0.9)',
+                        borderColor: 'rgba(135,252,217,0.3)',
+                        background: 'rgba(135,252,217,0.06)',
+                        fontWeight: 600
+                      }}
+                    />
+>>>>>>> 262d8b4 (Initial commit)
                   ))}
                 </Box>
               </Paper>
@@ -459,6 +656,7 @@ export default function ReportGenerator({ currentOption }) {
         {!isRecalculoPanel && !isCategoryPanel ? (
           <Grid item xs={12} lg={8}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'center' }}>
+<<<<<<< HEAD
               <Typography variant="h6" sx={{ color: 'white' }}>Evidencias ({slots.length})</Typography>
             </Box>
 
@@ -466,6 +664,15 @@ export default function ReportGenerator({ currentOption }) {
               <AnimatePresence>
                 {slots.map((slot) => (
                   <Grid item xs={12} md={6} lg={4} key={slot.id} component={motion.div} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+=======
+              <Typography variant="h6" sx={{ color: 'white', letterSpacing: 0.2 }}>Evidencias ({slots.length})</Typography>
+            </Box>
+
+            <Grid container spacing={2.5}>
+              <AnimatePresence>
+                {slots.map((slot) => (
+                  <Grid item xs={12} sm={6} md={6} lg={4} key={slot.id} component={motion.div} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+>>>>>>> 262d8b4 (Initial commit)
                     <ImageSlot slot={slot} onChange={handleSlotChange} onDelete={handleSlotDelete} />
                   </Grid>
                 ))}
@@ -475,14 +682,31 @@ export default function ReportGenerator({ currentOption }) {
 
             {totalToProcess > 0 && (
               <Box sx={{ mt: 2 }}>
+<<<<<<< HEAD
                 <LinearProgress variant="determinate" value={progressValue} />
+=======
+                <LinearProgress
+                  variant="determinate"
+                  value={progressValue}
+                  sx={{
+                    height: 8,
+                    borderRadius: 999,
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    '& .MuiLinearProgress-bar': { backgroundColor: '#87fcd9' }
+                  }}
+                />
+>>>>>>> 262d8b4 (Initial commit)
                 <Typography variant="caption" sx={{ color: 'white', mt: 1 }}>{processedCount} / {totalToProcess} procesadas</Typography>
               </Box>
             )}
           </Grid>
         ) : (
           <Grid item xs={12} lg={8}>
+<<<<<<< HEAD
             <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 2 }}>
+=======
+            <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 2, border: '1px solid rgba(255,255,255,0.05)' }}>
+>>>>>>> 262d8b4 (Initial commit)
               <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.92)', mb: 1 }}>
                 Esta pestaña es de consulta y cálculo solamente. No puedes añadir evidencias ni generar reportes desde aquí.
               </Typography>
@@ -496,6 +720,7 @@ export default function ReportGenerator({ currentOption }) {
 
       {!isRecalculoPanel && !isCategoryPanel && (
         <Paper elevation={24} sx={{
+<<<<<<< HEAD
           position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)', zIndex: 1300, p: 1, borderRadius: '50px',
           display: 'flex', gap: 2, bgcolor: 'rgba(26, 26, 46, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid #87fcd9'
         }}>
@@ -503,10 +728,59 @@ export default function ReportGenerator({ currentOption }) {
             Añadir Extra
           </Button>
           <Button variant="contained" startIcon={<DescriptionIcon />} onClick={handleGenerateWord} disabled={loading} sx={{ bgcolor: '#87fcd9', color: '#1a1a2e', fontWeight: '900', px: 4, borderRadius: '30px' }}>
+=======
+          position: 'fixed',
+          bottom: 24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1300,
+          p: 1,
+          borderRadius: '999px',
+          display: 'flex',
+          gap: 1.5,
+          bgcolor: 'rgba(15,23,42,0.85)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(135,252,217,0.3)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.45)'
+        }}>
+          <Button
+            variant="text"
+            startIcon={<AddIcon />}
+            onClick={handleAddSlot}
+            sx={{
+              color: '#87fcd9',
+              px: 3,
+              borderRadius: '30px',
+              fontWeight: 'bold',
+              '&:hover': { backgroundColor: 'rgba(135,252,217,0.1)' }
+            }}
+          >
+            Añadir Extra
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<DescriptionIcon />}
+            onClick={handleGenerateWord}
+            disabled={loading}
+            sx={{
+              bgcolor: '#87fcd9',
+              color: '#0f172a',
+              fontWeight: 900,
+              px: 4,
+              borderRadius: '30px',
+              '&:hover': { bgcolor: '#6ee7c8' },
+              '&:disabled': { bgcolor: 'rgba(135,252,217,0.35)', color: 'rgba(15,23,42,0.65)' }
+            }}
+          >
+>>>>>>> 262d8b4 (Initial commit)
             {loading ? 'Procesando...' : 'Descargar Reporte'}
           </Button>
         </Paper>
       )}
     </Container>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 262d8b4 (Initial commit)

@@ -1,11 +1,23 @@
 // src/App.jsx
 import React, { useState, useEffect } from 'react';
+<<<<<<< HEAD
 import { Box, Typography, Chip, IconButton, Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button } from '@mui/material';
 import Sidebar from './components/Sidebar';
 import ReportGenerator from './components/ReportGenerator';
 import { CMC_STRUCTURE } from './data/cmcData';
 import BoltIcon from '@mui/icons-material/Bolt';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+=======
+import { Box, Typography, Chip, IconButton, Dialog, DialogTitle, DialogContent, TextField, DialogActions, Button, Tabs, Tab } from '@mui/material';
+import Sidebar from './components/Sidebar';
+import ReportGenerator from './components/ReportGenerator';
+import FirestoreDemo from './components/FirestoreDemo';
+import { CMC_STRUCTURE } from './data/cmcData';
+import BoltIcon from '@mui/icons-material/Bolt';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import StorageIcon from '@mui/icons-material/Storage';
+import DescriptionIcon from '@mui/icons-material/Description';
+>>>>>>> 262d8b4 (Initial commit)
 
 const initialCategory = Object.keys(CMC_STRUCTURE)[0];
 const initialOptionName = Object.keys(CMC_STRUCTURE[initialCategory].options)[0];
@@ -16,6 +28,10 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('cmc_is_admin'));
   const [openAdminDialog, setOpenAdminDialog] = useState(false);
   const [adminPin, setAdminPin] = useState('');
+<<<<<<< HEAD
+=======
+  const [activeTab, setActiveTab] = useState(0);
+>>>>>>> 262d8b4 (Initial commit)
 
   useEffect(() => {
     setIsAdmin(!!localStorage.getItem('cmc_is_admin'));
@@ -41,7 +57,11 @@ export default function App() {
       <Sidebar onSelectOption={(opt, cat) => setCurrentOption(getOptionData(opt, cat))} />
 
       <Box component="main" sx={{ flexGrow: 1, p: 4, ml: { md: '280px' } }}>
+<<<<<<< HEAD
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 5, pb: 2 }}>
+=======
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, pb: 2 }}>
+>>>>>>> 262d8b4 (Initial commit)
           <Box>
             <Typography variant="h4" sx={{ color: 'white', mb: 0.5 }}>
               Ridery <span style={{ color: '#87fcd9' }}>Tools</span>
@@ -65,7 +85,29 @@ export default function App() {
           </Box>
         </Box>
 
+<<<<<<< HEAD
         <ReportGenerator currentOption={currentOption} />
+=======
+        {/* Tabs for switching between Reports and Firestore */}
+        <Box sx={{ borderBottom: 1, borderColor: 'rgba(255,255,255,0.1)', mb: 3 }}>
+          <Tabs 
+            value={activeTab} 
+            onChange={(e, newValue) => setActiveTab(newValue)}
+            sx={{
+              '& .MuiTab-root': { color: 'rgba(255,255,255,0.6)', fontWeight: 600 },
+              '& .Mui-selected': { color: '#87fcd9' },
+              '& .MuiTabs-indicator': { backgroundColor: '#87fcd9' }
+            }}
+          >
+            <Tab icon={<DescriptionIcon />} label="Reports" iconPosition="start" />
+            <Tab icon={<StorageIcon />} label="Firestore Database" iconPosition="start" />
+          </Tabs>
+        </Box>
+
+        {/* Tab Content */}
+        {activeTab === 0 && <ReportGenerator currentOption={currentOption} />}
+        {activeTab === 1 && <FirestoreDemo />}
+>>>>>>> 262d8b4 (Initial commit)
       </Box>
 
       <Dialog open={openAdminDialog} onClose={handleCloseAdmin}>
