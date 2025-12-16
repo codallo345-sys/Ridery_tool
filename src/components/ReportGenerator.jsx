@@ -36,7 +36,6 @@ const createNewSlot = (title = 'Evidencia Adicional') => ({
 const FONT_SIZE = 18;
 const BORDER_COLOR = 'E0E0E0';
 const CONCURRENCY_LIMIT = 3;
-const CELL_PADDING_CM = 0.5; // Padding within each cell for images
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -130,27 +129,13 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
   const rows = [];
   let currentCells = [];
 
-  // Calculate proper cell width for the table to fit within A4 page margins
-  // A4 width = 21cm, with 2cm margins on each side = 17cm usable width
-  const usableWidthCm = 17.0;
-  const cellWidthCm = usableWidthCm / cols;
-  const cellWidthTwips = Math.round(cellWidthCm * CM_TO_TWIPS);
+  const firstWidthCm = processed[0]?.dims?.widthCm || 10;
+  const cellWidthTwips = Math.round(firstWidthCm * CM_TO_TWIPS);
   const tableWidthTwips = cellWidthTwips * cols;
 
   for (let i = 0; i < processed.length; i++) {
-    const { slot, result, dims } = processed[i];
+    const { slot, result } = processed[i];
     const imageType = (result.mime && result.mime.toLowerCase().includes('png')) ? 'png' : 'jpeg';
-
-    // Calculate image dimensions to fit within cell while maintaining aspect ratio
-    const maxImageWidthCm = cellWidthCm - CELL_PADDING_CM;
-    const aspectRatio = dims.heightCm / dims.widthCm;
-    
-    // Scale dimensions if needed to fit within cell
-    let imageWidthCm = Math.min(maxImageWidthCm, dims.widthCm);
-    let imageHeightCm = imageWidthCm * aspectRatio;
-    
-    const imageWidthTwips = Math.round(imageWidthCm * CM_TO_TWIPS);
-    const imageHeightTwips = Math.round(imageHeightCm * CM_TO_TWIPS);
 
     const titleParagraph = new Paragraph({
       children: [new TextRun({ text: slot.title || 'Evidencia', bold: true, size: FONT_SIZE, font: 'Calibri' })],
@@ -159,11 +144,7 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
     });
 
     const imageParagraph = new Paragraph({
-      children: [new ImageRun({ 
-        data: result.buffer, 
-        transformation: { width: imageWidthTwips, height: imageHeightTwips }, 
-        type: imageType 
-      })],
+      children: [new ImageRun({ data: result.buffer, transformation: { width: result.width, height: result.height }, type: imageType })],
       alignment: AlignmentType.CENTER,
       spacing: { after: 80 }
     });
