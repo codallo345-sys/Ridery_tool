@@ -2,7 +2,7 @@
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
 
-export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600 }) {
+export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: 1 }) {
   if (!file) throw new Error('No file provided');
 
   const loadImage = (file) => new Promise((resolve, reject) => {
@@ -25,8 +25,11 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   const img = await loadImage(file);
 
-  const targetWidth = Math.max(1, Math.round(targetDims?.width || 800));
-  const targetHeight = Math.max(1, Math.round(targetDims?.height || 600));
+  const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
+  const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
+  const renderScale = Math.max(1, Math.round(targetDims?.renderScale || 1));
+  const targetWidth = Math.max(1, displayWidth * renderScale);
+  const targetHeight = Math.max(1, displayHeight * renderScale);
 
   const rot = ((rotation || 0) % 360 + 360) % 360;
   const swap = rot === 90 || rot === 270;
@@ -65,14 +68,14 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   }
 
   // Use JPEG with high quality (0.95) for better file size/quality balance
-  const mime = 'image/jpeg';
-  const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime, 0.95));
+  const mime = 'image/png';
+  const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime));
   const arrayBuffer = await blob.arrayBuffer();
 
   return {
     buffer: arrayBuffer,
-    width: canvas.width,
-    height: canvas.height,
+    width: displayWidth,
+    height: displayHeight,
     mime
   };
 }

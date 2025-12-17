@@ -45,6 +45,7 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.17, heightCm: 3.12 },
   vertical: { widthCm: 4.6, heightCm: 9.55 }
 };
+const QUALITY_RENDER_SCALE = 3; // render at higher resolution to improve clarity in Word
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -129,24 +130,28 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
   const baseDims = orientation === 'vertical' ? BASE_DIMS_CM.vertical : BASE_DIMS_CM.horizontal;
   const targetWidthCm = Math.min(cellWidthCm, baseDims.widthCm);
   const targetHeightCm = targetWidthCm * (baseDims.heightCm / baseDims.widthCm);
-  const targetWidthPx = Math.max(1, Math.round(targetWidthCm * CM_TO_PIXELS));
-  const targetHeightPx = Math.max(1, Math.round(targetHeightCm * CM_TO_PIXELS));
+  const targetDisplayWidthPx = Math.max(1, Math.round(targetWidthCm * CM_TO_PIXELS));
+  const targetDisplayHeightPx = Math.max(1, Math.round(targetHeightCm * CM_TO_PIXELS));
+  const renderScale = QUALITY_RENDER_SCALE;
 
   const processed = await Promise.all(
     slots.map((s) =>
       limit(async () => {
         const dims = getDimensionsFor(s.size || 'normal', s.orientation || 'horizontal', 1);
-        const baseWidth = Math.max(1, dims.width ?? targetWidthPx);
-        const aspectRatio = (dims.height && dims.width) ? dims.height / dims.width : (targetHeightPx / targetWidthPx);
+        const baseWidth = Math.max(1, dims.width ?? targetDisplayWidthPx);
+        const aspectRatio = (dims.height && dims.width) ? dims.height / dims.width : (targetDisplayHeightPx / targetDisplayWidthPx);
         const baseHeightFromAspect = Math.round(baseWidth * aspectRatio);
         let baseHeight = dims.height;
         if (baseHeight === undefined || baseHeight === null) baseHeight = baseHeightFromAspect;
-        if (baseHeight === undefined || baseHeight === null) baseHeight = targetHeightPx;
+        if (baseHeight === undefined || baseHeight === null) baseHeight = targetDisplayHeightPx;
         baseHeight = Math.max(1, baseHeight); // preserve aspect ratio even if height is missing
-        const scale = Math.min(1, targetWidthPx / baseWidth);
+        const scale = Math.min(1, targetDisplayWidthPx / baseWidth);
         const targetDims = {
           width: Math.max(1, Math.round(baseWidth * scale)),
-          height: Math.max(1, Math.round(baseHeight * scale))
+          height: Math.max(1, Math.round(baseHeight * scale)),
+          displayWidth: targetDisplayWidthPx,
+          displayHeight: targetDisplayHeightPx,
+          renderScale
         };
         const result = await processImageForReport(s.file, s.rotation || 0, s.orientation || 'horizontal', targetDims);
         if (onProgress) onProgress();
