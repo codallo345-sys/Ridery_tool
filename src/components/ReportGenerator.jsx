@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import ImageSlot from './ImageSlot';
 import { processImageForReport } from '../utils/cmcImageProcessor';
-import { getDimensionsFor, CM_TO_TWIPS } from '../utils/cmcDimensions';
+import { getDimensionsFor, CM_TO_TWIPS, CM_TO_PIXELS } from '../utils/cmcDimensions';
 import CompactCalculator from './CompactCalculator';
 import RecalculationGuide from './RecalculationGuide';
 import RecalculationPanel from './RecalculationPanel';
@@ -36,6 +36,10 @@ const createNewSlot = (title = 'Evidencia Adicional') => ({
 const FONT_SIZE = 18;
 const BORDER_COLOR = 'E0E0E0';
 const CONCURRENCY_LIMIT = 3;
+const PAGE_WIDTH_TWIPS = 11906; // ~21 cm (A4) to keep tables within page width
+const PAGE_MARGIN_TWIPS = 720;  // matches section margin definition
+const HORIZONTAL_COLS = { normal: 3, mediana: 2, grande: 3 };
+const VERTICAL_COLS = { normal: 3, mediana: 2, grande: 1 };
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -110,13 +114,25 @@ Uso:
 // --- funciones para generar tablas de imágenes (.docx) ---
 const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) => {
   if (!slots || slots.length === 0) return;
+  const safeCols = Math.max(1, cols || 1);
   const limit = pLimit(CONCURRENCY_LIMIT);
+
+  const usableWidthTwips = Math.max(1, PAGE_WIDTH_TWIPS - (PAGE_MARGIN_TWIPS * 2));
+  const cellWidthTwips = Math.floor(usableWidthTwips / safeCols);
+  const tableWidthTwips = cellWidthTwips * safeCols;
+  const cellWidthCm = cellWidthTwips / CM_TO_TWIPS;
+  const maxImageWidthPx = Math.max(1, Math.round(cellWidthCm * CM_TO_PIXELS));
 
   const processed = await Promise.all(
     slots.map((s) =>
       limit(async () => {
         const dims = getDimensionsFor(s.size || 'normal', s.orientation || 'horizontal', 1);
-        const targetDims = { width: dims.width, height: dims.height };
+        const baseWidth = dims.width || maxImageWidthPx;
+        const scale = Math.min(1, maxImageWidthPx / baseWidth);
+        const targetDims = {
+          width: Math.max(1, Math.round(baseWidth * scale)),
+          height: Math.max(1, Math.round((dims.height || maxImageWidthPx) * scale))
+        };
         const result = await processImageForReport(s.file, s.rotation || 0, s.orientation || 'horizontal', targetDims);
         if (onProgress) onProgress();
         return { slot: s, result, dims };
@@ -128,10 +144,6 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
 
   const rows = [];
   let currentCells = [];
-
-  const firstWidthCm = processed[0]?.dims?.widthCm || 10;
-  const cellWidthTwips = Math.round(firstWidthCm * CM_TO_TWIPS);
-  const tableWidthTwips = cellWidthTwips * cols;
 
   for (let i = 0; i < processed.length; i++) {
     const { slot, result } = processed[i];
@@ -162,14 +174,14 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
 
     currentCells.push(cell);
 
-    if (currentCells.length === cols) {
+    if (currentCells.length === safeCols) {
       rows.push(new TableRow({ children: currentCells }));
       currentCells = [];
     }
   }
 
   if (currentCells.length > 0) {
-    while (currentCells.length < cols) {
+    while (currentCells.length < safeCols) {
       currentCells.push(new TableCell({
         children: [],
         width: { size: cellWidthTwips, type: WidthType.DXA },
@@ -326,22 +338,24 @@ export default function ReportGenerator({ currentOption }) {
         }
       }
 
-      const horizontalSlots = validSlots.filter(s => s.orientation === 'horizontal');
+      const horizontalSlots = validSlots.filter(s => s.orientation !== 'vertical');
       const verticalSlots = validSlots.filter(s => s.orientation === 'vertical');
 
-      const groupAndProcess = async (arr, onProgress) => {
+      const groupAndProcess = async (arr, orientation, onProgress) => {
         const bySize = { normal: [], mediana: [], grande: [] };
         arr.forEach(s => bySize[s.size || 'normal'].push(s));
 
-        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, 3, docChildren, onProgress);
-        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, 2, docChildren, onProgress);
-        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, 1, docChildren, onProgress);
+        const colMap = orientation === 'horizontal' ? HORIZONTAL_COLS : VERTICAL_COLS;
+
+        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, colMap.normal, docChildren, onProgress);
+        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, colMap.mediana, docChildren, onProgress);
+        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, colMap.grande, docChildren, onProgress);
       };
 
       const onProgress = () => setProcessedCount(p => p + 1);
 
-      if (horizontalSlots.length > 0) await groupAndProcess(horizontalSlots, onProgress);
-      if (verticalSlots.length > 0) await groupAndProcess(verticalSlots, onProgress);
+      if (horizontalSlots.length > 0) await groupAndProcess(horizontalSlots, 'horizontal', onProgress);
+      if (verticalSlots.length > 0) await groupAndProcess(verticalSlots, 'vertical', onProgress);
 
       const doc = new Document({
         sections: [{
