@@ -40,8 +40,7 @@ const PAGE_WIDTH_CM = 21; // A4 width in cm (used to bound tables)
 const PAGE_WIDTH_TWIPS = Math.round(PAGE_WIDTH_CM * CM_TO_TWIPS); // ~21 cm page width to bound table width
 const PAGE_MARGIN_CM = 1.27; // 0.5 in
 const PAGE_MARGIN_TWIPS = Math.round(PAGE_MARGIN_CM * CM_TO_TWIPS);  // aligns with section page.margin defined in the Document
-const HORIZONTAL_COLS = { normal: 3, mediana: 2, grande: 3 }; // requirement: large horizontals still grouped in 3 columns
-const VERTICAL_COLS = { normal: 3, mediana: 2, grande: 1 }; // portrait images need more width, so large uses a single column
+const COLS_PER_ROW = 3; // fixed 3 images per row as requested
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -352,21 +351,19 @@ export default function ReportGenerator({ currentOption }) {
       });
       const verticalSlots = validSlots.filter(s => s.orientation === 'vertical');
 
-      const groupAndProcess = async (arr, orientation, onProgress) => {
+      const groupAndProcess = async (arr, onProgress) => {
         const bySize = { normal: [], mediana: [], grande: [] };
         arr.forEach(s => bySize[s.size || 'normal'].push(s));
 
-        const colMap = orientation === 'horizontal' ? HORIZONTAL_COLS : VERTICAL_COLS;
-
-        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, colMap.normal, docChildren, onProgress);
-        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, colMap.mediana, docChildren, onProgress);
-        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, colMap.grande, docChildren, onProgress);
+        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, COLS_PER_ROW, docChildren, onProgress);
+        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, COLS_PER_ROW, docChildren, onProgress);
+        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, COLS_PER_ROW, docChildren, onProgress);
       };
 
       const onProgress = () => setProcessedCount(p => p + 1);
 
-      if (horizontalSlots.length > 0) await groupAndProcess(horizontalSlots, 'horizontal', onProgress);
-      if (verticalSlots.length > 0) await groupAndProcess(verticalSlots, 'vertical', onProgress);
+      if (horizontalSlots.length > 0) await groupAndProcess(horizontalSlots, onProgress);
+      if (verticalSlots.length > 0) await groupAndProcess(verticalSlots, onProgress);
 
       const doc = new Document({
         sections: [{
