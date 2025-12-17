@@ -40,7 +40,11 @@ const PAGE_WIDTH_CM = 21; // A4 width in cm (used to bound tables)
 const PAGE_WIDTH_TWIPS = Math.round(PAGE_WIDTH_CM * CM_TO_TWIPS); // ~21 cm page width to bound table width
 const PAGE_MARGIN_CM = 1.27; // 0.5 in
 const PAGE_MARGIN_TWIPS = Math.round(PAGE_MARGIN_CM * CM_TO_TWIPS);  // aligns with section page.margin defined in the Document
-const COLS_PER_ROW = 3; // fixed 3 images per row as requested
+const COLS_PER_ROW = 4; // fixed 4 images per row as requested
+const BASE_DIMS_CM = {
+  horizontal: { widthCm: 6.17, heightCm: 3.12 },
+  vertical: { widthCm: 4.6, heightCm: 9.55 }
+};
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -113,7 +117,7 @@ Uso:
 };
 
 // --- funciones para generar tablas de imágenes (.docx) ---
-const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) => {
+const generateImageTableForGroup = async (slots, cols, orientation, docChildren, onProgress) => {
   if (!slots || slots.length === 0) return;
   const safeCols = Math.max(1, cols || 1);
   const limit = pLimit(CONCURRENCY_LIMIT);
@@ -122,20 +126,24 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
   const cellWidthTwips = Math.floor(usableWidthTwips / safeCols);
   const tableWidthTwips = cellWidthTwips * safeCols;
   const cellWidthCm = cellWidthTwips / CM_TO_TWIPS;
-  const maxImageWidthPx = Math.max(1, Math.round(cellWidthCm * CM_TO_PIXELS));
+  const baseDims = orientation === 'vertical' ? BASE_DIMS_CM.vertical : BASE_DIMS_CM.horizontal;
+  const targetWidthCm = Math.min(cellWidthCm, baseDims.widthCm);
+  const targetHeightCm = targetWidthCm * (baseDims.heightCm / baseDims.widthCm);
+  const targetWidthPx = Math.max(1, Math.round(targetWidthCm * CM_TO_PIXELS));
+  const targetHeightPx = Math.max(1, Math.round(targetHeightCm * CM_TO_PIXELS));
 
   const processed = await Promise.all(
     slots.map((s) =>
       limit(async () => {
         const dims = getDimensionsFor(s.size || 'normal', s.orientation || 'horizontal', 1);
-        const baseWidth = Math.max(1, dims.width ?? maxImageWidthPx);
-        const aspectRatio = (dims.height && dims.width) ? dims.height / dims.width : 1;
+        const baseWidth = Math.max(1, dims.width ?? targetWidthPx);
+        const aspectRatio = (dims.height && dims.width) ? dims.height / dims.width : (targetHeightPx / targetWidthPx);
         const baseHeightFromAspect = Math.round(baseWidth * aspectRatio);
         let baseHeight = dims.height;
         if (baseHeight === undefined || baseHeight === null) baseHeight = baseHeightFromAspect;
-        if (baseHeight === undefined || baseHeight === null) baseHeight = maxImageWidthPx;
+        if (baseHeight === undefined || baseHeight === null) baseHeight = targetHeightPx;
         baseHeight = Math.max(1, baseHeight); // preserve aspect ratio even if height is missing
-        const scale = Math.min(1, maxImageWidthPx / baseWidth);
+        const scale = Math.min(1, targetWidthPx / baseWidth);
         const targetDims = {
           width: Math.max(1, Math.round(baseWidth * scale)),
           height: Math.max(1, Math.round(baseHeight * scale))
@@ -351,19 +359,19 @@ export default function ReportGenerator({ currentOption }) {
       });
       const verticalSlots = validSlots.filter(s => s.orientation === 'vertical');
 
-      const groupAndProcess = async (arr, onProgress) => {
+      const groupAndProcess = async (arr, orientation, onProgress) => {
         const bySize = { normal: [], mediana: [], grande: [] };
         arr.forEach(s => bySize[s.size || 'normal'].push(s));
 
-        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, COLS_PER_ROW, docChildren, onProgress);
-        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, COLS_PER_ROW, docChildren, onProgress);
-        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, COLS_PER_ROW, docChildren, onProgress);
+        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, COLS_PER_ROW, orientation, docChildren, onProgress);
+        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, COLS_PER_ROW, orientation, docChildren, onProgress);
+        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, COLS_PER_ROW, orientation, docChildren, onProgress);
       };
 
       const onProgress = () => setProcessedCount(p => p + 1);
 
-      if (horizontalSlots.length > 0) await groupAndProcess(horizontalSlots, onProgress);
-      if (verticalSlots.length > 0) await groupAndProcess(verticalSlots, onProgress);
+      if (horizontalSlots.length > 0) await groupAndProcess(horizontalSlots, 'horizontal', onProgress);
+      if (verticalSlots.length > 0) await groupAndProcess(verticalSlots, 'vertical', onProgress);
 
       const doc = new Document({
         sections: [{
