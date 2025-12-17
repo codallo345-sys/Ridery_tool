@@ -36,10 +36,12 @@ const createNewSlot = (title = 'Evidencia Adicional') => ({
 const FONT_SIZE = 18;
 const BORDER_COLOR = 'E0E0E0';
 const CONCURRENCY_LIMIT = 3;
-const PAGE_WIDTH_TWIPS = 11906; // ~21 cm (A4) to keep tables within page width
-const PAGE_MARGIN_TWIPS = 720;  // matches section margin definition
-const HORIZONTAL_COLS = { normal: 3, mediana: 2, grande: 3 };
-const VERTICAL_COLS = { normal: 3, mediana: 2, grande: 1 };
+const PAGE_WIDTH_CM = 21; // A4 width in cm (used to bound tables)
+const PAGE_WIDTH_TWIPS = Math.round(PAGE_WIDTH_CM * CM_TO_TWIPS); // ~21 cm page width to bound table width
+const PAGE_MARGIN_CM = 1.27; // 0.5 in
+const PAGE_MARGIN_TWIPS = Math.round(PAGE_MARGIN_CM * CM_TO_TWIPS);  // aligns with section page.margin defined in the Document
+const HORIZONTAL_COLS = { normal: 3, mediana: 2, grande: 3 }; // requirement: large horizontals still grouped in 3 columns
+const VERTICAL_COLS = { normal: 3, mediana: 2, grande: 1 }; // portrait images need more width, so large uses a single column
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -127,11 +129,17 @@ const generateImageTableForGroup = async (slots, cols, docChildren, onProgress) 
     slots.map((s) =>
       limit(async () => {
         const dims = getDimensionsFor(s.size || 'normal', s.orientation || 'horizontal', 1);
-        const baseWidth = dims.width || maxImageWidthPx;
+        const baseWidth = Math.max(1, dims.width ?? maxImageWidthPx);
+        const aspectRatio = (dims.height && dims.width) ? dims.height / dims.width : 1;
+        const baseHeightFromAspect = Math.round(baseWidth * aspectRatio);
+        let baseHeight = dims.height;
+        if (baseHeight === undefined || baseHeight === null) baseHeight = baseHeightFromAspect;
+        if (baseHeight === undefined || baseHeight === null) baseHeight = maxImageWidthPx;
+        baseHeight = Math.max(1, baseHeight); // preserve aspect ratio even if height is missing
         const scale = Math.min(1, maxImageWidthPx / baseWidth);
         const targetDims = {
           width: Math.max(1, Math.round(baseWidth * scale)),
-          height: Math.max(1, Math.round((dims.height || maxImageWidthPx) * scale))
+          height: Math.max(1, Math.round(baseHeight * scale))
         };
         const result = await processImageForReport(s.file, s.rotation || 0, s.orientation || 'horizontal', targetDims);
         if (onProgress) onProgress();
@@ -338,7 +346,10 @@ export default function ReportGenerator({ currentOption }) {
         }
       }
 
-      const horizontalSlots = validSlots.filter(s => s.orientation !== 'vertical');
+      const horizontalSlots = validSlots.filter((s) => {
+        const orientation = s.orientation ?? 'horizontal';
+        return orientation === 'horizontal';
+      });
       const verticalSlots = validSlots.filter(s => s.orientation === 'vertical');
 
       const groupAndProcess = async (arr, orientation, onProgress) => {
