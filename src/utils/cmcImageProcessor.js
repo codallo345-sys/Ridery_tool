@@ -37,7 +37,7 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const srcHeight = img.height || img.naturalHeight || displayHeight;
   const needsRotation = rot !== 0;
 
-  // Render capped to avoid archivos .docx pesados; nunca se escala más allá de 1080p aprox.
+  // Render limitado para evitar .docx pesados; no se escala más allá de ~1080p.
   const scaleFactor = Math.min(maxWidth / srcWidth, maxHeight / srcHeight, 1);
   const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor * renderScale));
   const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor * renderScale));
