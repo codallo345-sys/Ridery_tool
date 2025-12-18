@@ -3,6 +3,7 @@
 // - processImageForReport(file, rotation, orientation, targetDims?)
 
 const MIN_JPEG_QUALITY = 0.3;
+const MIN_RENDER_SCALE = 0.1;
 
 export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = {}) {
   if (!file) throw new Error('No file provided');
@@ -42,17 +43,19 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const displayHeight = Math.max(1, Math.round(displayHeightOverride || height));
   const maxWidthPx = Math.max(1, Math.round(maxWidth));
   const maxHeightPx = Math.max(1, Math.round(maxHeight));
-  const renderScalePx = Math.max(0.1, Number(renderScale) || 1);
+  const renderScalePx = Math.max(MIN_RENDER_SCALE, Number(renderScale) || 1);
   const qualityClamped = Math.min(1, Math.max(MIN_JPEG_QUALITY, quality));
 
   const rot = ((rotation || 0) % 360 + 360) % 360;
   const srcWidth = img.width || img.naturalWidth || displayWidth;
   const srcHeight = img.height || img.naturalHeight || displayHeight;
+  const safeSrcWidth = Math.max(1, srcWidth || 0);
+  const safeSrcHeight = Math.max(1, srcHeight || 0);
 
   // Limit rendering to keep .docx outputs lightweight; cap at 1920x1080.
-  const scaleFactor = Math.min(maxWidthPx / srcWidth, maxHeightPx / srcHeight, 1);
-  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor * renderScalePx));
-  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor * renderScalePx));
+  const scaleFactor = Math.min(maxWidthPx / safeSrcWidth, maxHeightPx / safeSrcHeight, 1);
+  const targetWidth = Math.max(1, Math.round(safeSrcWidth * scaleFactor * renderScalePx));
+  const targetHeight = Math.max(1, Math.round(safeSrcHeight * scaleFactor * renderScalePx));
   const swap = rot === 90 || rot === 270;
   const canvasWidth = swap ? targetHeight : targetWidth;
   const canvasHeight = swap ? targetWidth : targetHeight;
