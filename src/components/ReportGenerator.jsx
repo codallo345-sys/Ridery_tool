@@ -436,7 +436,7 @@ export default function ReportGenerator({ currentOption }) {
       maxWidth="xl"
       sx={{
         pb: 15,
-        background: 'linear-gradient(135deg, #0f172a, #111827)',
+        background: 'transparent',
         minHeight: '100vh',
         py: 4
       }}
