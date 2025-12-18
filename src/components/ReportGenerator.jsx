@@ -45,7 +45,7 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.17, heightCm: 3.12 },
   vertical: { widthCm: 4.6, heightCm: 9.55 }
 };
-const QUALITY_RENDER_SCALE = 1; // limita resolución extra para reducir peso del .docx
+const QUALITY_RENDER_SCALE = 1; // limits extra resolution to reduce .docx size
 const MAX_OUTPUT_WIDTH_PX = 1920;
 const MAX_OUTPUT_HEIGHT_PX = 1080;
 const JPEG_QUALITY = 0.72;
