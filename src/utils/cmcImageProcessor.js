@@ -1,8 +1,10 @@
 // src/utils/cmcImageProcessor.js
 // Processes an image File and returns { buffer, width, height, mime }
-// - processImageForReport(file, rotation, orientation, targetDims = { width, height, renderScale, maxWidth, maxHeight, quality })
+// - processImageForReport(file, rotation, orientation, targetDims?)
 
-export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: 1, maxWidth: 1920, maxHeight: 1080, quality: 0.72 }) {
+const MIN_JPEG_QUALITY = 0.3;
+
+export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = {}) {
   if (!file) throw new Error('No file provided');
 
   const loadImage = (file) => new Promise((resolve, reject) => {
@@ -25,22 +27,32 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   const img = await loadImage(file);
 
-  const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
-  const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
-  const maxWidth = Math.max(1, Math.round(targetDims?.maxWidth || 1920));
-  const maxHeight = Math.max(1, Math.round(targetDims?.maxHeight || 1080));
-  const renderScale = Math.max(1, Math.round(targetDims?.renderScale || 1));
-  const quality = Math.min(1, Math.max(0.3, targetDims?.quality ?? 0.72));
+  const {
+    width = 800,
+    height = 600,
+    renderScale = 1,
+    maxWidth = 1920,
+    maxHeight = 1080,
+    quality = 0.72,
+    displayWidth: displayWidthOverride,
+    displayHeight: displayHeightOverride
+  } = targetDims || {};
+
+  const displayWidth = Math.max(1, Math.round(displayWidthOverride || width || 800));
+  const displayHeight = Math.max(1, Math.round(displayHeightOverride || height || 600));
+  const maxWidthPx = Math.max(1, Math.round(maxWidth));
+  const maxHeightPx = Math.max(1, Math.round(maxHeight));
+  const renderScalePx = Math.max(1, Math.round(renderScale));
+  const qualityClamped = Math.min(1, Math.max(MIN_JPEG_QUALITY, quality));
 
   const rot = ((rotation || 0) % 360 + 360) % 360;
   const srcWidth = img.width || img.naturalWidth || displayWidth;
   const srcHeight = img.height || img.naturalHeight || displayHeight;
-  const needsRotation = rot !== 0;
 
-  // Limit rendering to keep .docx outputs lightweight; no scaling beyond ~1080p.
-  const scaleFactor = Math.min(maxWidth / srcWidth, maxHeight / srcHeight, 1);
-  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor * renderScale));
-  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor * renderScale));
+  // Limit rendering to keep .docx outputs lightweight; cap at 1920x1080.
+  const scaleFactor = Math.min(maxWidthPx / srcWidth, maxHeightPx / srcHeight, 1);
+  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor * renderScalePx));
+  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor * renderScalePx));
   const swap = rot === 90 || rot === 270;
   const canvasWidth = swap ? targetHeight : targetWidth;
   const canvasHeight = swap ? targetWidth : targetHeight;
@@ -67,7 +79,7 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   }
 
   const mime = 'image/jpeg';
-  const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime, quality));
+  const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime, qualityClamped));
   const arrayBuffer = await blob.arrayBuffer();
 
   return {
