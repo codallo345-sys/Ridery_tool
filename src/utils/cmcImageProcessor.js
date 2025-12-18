@@ -2,7 +2,7 @@
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
 
-export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: 1 }) {
+export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: 1, minWidth: 1920, minHeight: 1080 }) {
   if (!file) throw new Error('No file provided');
 
   const loadImage = (file) => new Promise((resolve, reject) => {
@@ -27,11 +27,31 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
   const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
+  const minWidth = Math.max(1, Math.round(targetDims?.minWidth || 1920));
+  const minHeight = Math.max(1, Math.round(targetDims?.minHeight || 1080));
   const renderScale = Math.max(1, Math.round(targetDims?.renderScale || 1));
-  const targetWidth = Math.max(1, displayWidth * renderScale);
-  const targetHeight = Math.max(1, displayHeight * renderScale);
 
   const rot = ((rotation || 0) % 360 + 360) % 360;
+  const srcWidth = img.width || img.naturalWidth || displayWidth;
+  const srcHeight = img.height || img.naturalHeight || displayHeight;
+  const needsRotation = rot !== 0;
+
+  // If no rotation and source already meets min resolution, use original buffer to avoid recompression
+  if (!needsRotation && srcWidth >= minWidth && srcHeight >= minHeight) {
+    const mime = file.type && file.type.includes('png') ? 'image/png' : file.type || 'image/png';
+    const arrayBuffer = await file.arrayBuffer();
+    return {
+      buffer: arrayBuffer,
+      width: displayWidth,
+      height: displayHeight,
+      mime
+    };
+  }
+
+  // Otherwise, render without downscaling; upscale if below minimums
+  const scaleFactor = Math.max(minWidth / srcWidth, minHeight / srcHeight, 1);
+  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor * renderScale));
+  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor * renderScale));
   const swap = rot === 90 || rot === 270;
   const canvasWidth = swap ? targetHeight : targetWidth;
   const canvasHeight = swap ? targetWidth : targetHeight;
@@ -41,19 +61,9 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   canvas.height = canvasHeight;
   const ctx = canvas.getContext('2d', { alpha: false });
 
-  // Fill white background for better quality
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const srcWidth = img.width || img.naturalWidth || targetWidth;
-  const srcHeight = img.height || img.naturalHeight || targetHeight;
-  const scale = Math.min(canvasWidth / srcWidth, canvasHeight / srcHeight);
-  const drawW = Math.round(srcWidth * scale);
-  const drawH = Math.round(srcHeight * scale);
-  const dx = Math.round((canvasWidth - drawW) / 2);
-  const dy = Math.round((canvasHeight - drawH) / 2);
-
-  // Enable image smoothing for better quality
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
@@ -61,13 +71,12 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     ctx.save();
     ctx.translate(canvasWidth / 2, canvasHeight / 2);
     ctx.rotate((rot * Math.PI) / 180);
-    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.drawImage(img, -targetWidth / 2, -targetHeight / 2, targetWidth, targetHeight);
     ctx.restore();
   } else {
-    ctx.drawImage(img, dx, dy, drawW, drawH);
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
   }
 
-  // Use JPEG with high quality (0.95) for better file size/quality balance
   const mime = 'image/png';
   const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime));
   const arrayBuffer = await blob.arrayBuffer();

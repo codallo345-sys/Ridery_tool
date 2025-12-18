@@ -46,6 +46,8 @@ const BASE_DIMS_CM = {
   vertical: { widthCm: 4.6, heightCm: 9.55 }
 };
 const QUALITY_RENDER_SCALE = 3; // render at higher resolution to improve clarity in Word
+const MIN_OUTPUT_WIDTH_PX = 1920;
+const MIN_OUTPUT_HEIGHT_PX = 1080;
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -133,6 +135,8 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
   const targetDisplayWidthPx = Math.max(1, Math.round(targetWidthCm * CM_TO_PIXELS));
   const targetDisplayHeightPx = Math.max(1, Math.round(targetHeightCm * CM_TO_PIXELS));
   const renderScale = QUALITY_RENDER_SCALE;
+  const minWidthPx = MIN_OUTPUT_WIDTH_PX;
+  const minHeightPx = MIN_OUTPUT_HEIGHT_PX;
 
   const processed = await Promise.all(
     slots.map((s) =>
@@ -151,7 +155,9 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
           height: Math.max(1, Math.round(baseHeight * scale)),
           displayWidth: targetDisplayWidthPx,
           displayHeight: targetDisplayHeightPx,
-          renderScale
+          renderScale,
+          minWidth: minWidthPx,
+          minHeight: minHeightPx
         };
         const result = await processImageForReport(s.file, s.rotation || 0, s.orientation || 'horizontal', targetDims);
         if (onProgress) onProgress();
