@@ -45,9 +45,10 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.17, heightCm: 3.12 },
   vertical: { widthCm: 4.6, heightCm: 9.55 }
 };
-const QUALITY_RENDER_SCALE = 3; // render at higher resolution to improve clarity in Word
-const MIN_OUTPUT_WIDTH_PX = 1920;
-const MIN_OUTPUT_HEIGHT_PX = 1080;
+const QUALITY_RENDER_SCALE = 1; // limitar para reducir peso en .docx
+const MAX_OUTPUT_WIDTH_PX = 1920;
+const MAX_OUTPUT_HEIGHT_PX = 1080;
+const JPEG_QUALITY = 0.72;
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -135,8 +136,8 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
   const targetDisplayWidthPx = Math.max(1, Math.round(targetWidthCm * CM_TO_PIXELS));
   const targetDisplayHeightPx = Math.max(1, Math.round(targetHeightCm * CM_TO_PIXELS));
   const renderScale = QUALITY_RENDER_SCALE;
-  const minWidthPx = MIN_OUTPUT_WIDTH_PX;
-  const minHeightPx = MIN_OUTPUT_HEIGHT_PX;
+  const maxWidthPx = MAX_OUTPUT_WIDTH_PX;
+  const maxHeightPx = MAX_OUTPUT_HEIGHT_PX;
 
   const processed = await Promise.all(
     slots.map((s) =>
@@ -156,8 +157,9 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
           displayWidth: targetDisplayWidthPx,
           displayHeight: targetDisplayHeightPx,
           renderScale,
-          minWidth: minWidthPx,
-          minHeight: minHeightPx
+          maxWidth: maxWidthPx,
+          maxHeight: maxHeightPx,
+          quality: JPEG_QUALITY
         };
         const result = await processImageForReport(s.file, s.rotation || 0, s.orientation || 'horizontal', targetDims);
         if (onProgress) onProgress();
