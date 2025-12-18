@@ -38,11 +38,11 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     displayHeight: displayHeightOverride
   } = targetDims || {};
 
-  const displayWidth = Math.max(1, Math.round(displayWidthOverride || width || 800));
-  const displayHeight = Math.max(1, Math.round(displayHeightOverride || height || 600));
+  const displayWidth = Math.max(1, Math.round(displayWidthOverride || width));
+  const displayHeight = Math.max(1, Math.round(displayHeightOverride || height));
   const maxWidthPx = Math.max(1, Math.round(maxWidth));
   const maxHeightPx = Math.max(1, Math.round(maxHeight));
-  const renderScalePx = Math.max(1, Math.round(renderScale));
+  const renderScalePx = Math.max(0.1, Number(renderScale) || 1);
   const qualityClamped = Math.min(1, Math.max(MIN_JPEG_QUALITY, quality));
 
   const rot = ((rotation || 0) % 360 + 360) % 360;
