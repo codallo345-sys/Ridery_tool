@@ -1,8 +1,11 @@
 // src/utils/cmcImageProcessor.js
-// Procesa una File/Image y devuelve { buffer, width, height, mime }
-// - processImageForReport(file, rotation, orientation, targetDims)
+// Processes an image File and returns { buffer, width, height, mime }
+// - processImageForReport(file, rotation, orientation, targetDims?)
 
-export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: 1, minWidth: 1920, minHeight: 1080 }) {
+const MIN_JPEG_QUALITY = 0.3;
+const MIN_RENDER_SCALE = 0.1;
+
+export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = {}) {
   if (!file) throw new Error('No file provided');
 
   const loadImage = (file) => new Promise((resolve, reject) => {
@@ -25,33 +28,35 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   const img = await loadImage(file);
 
-  const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
-  const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
-  const minWidth = Math.max(1, Math.round(targetDims?.minWidth || 1920));
-  const minHeight = Math.max(1, Math.round(targetDims?.minHeight || 1080));
-  const renderScale = Math.max(1, Math.round(targetDims?.renderScale || 1));
+  const {
+    width = 800,
+    height = 600,
+    renderScale = 1,
+    maxWidth = 1920,
+    maxHeight = 1080,
+    quality = 0.72,
+    displayWidth: displayWidthOverride,
+    displayHeight: displayHeightOverride
+  } = targetDims || {};
+
+  const displayWidth = Math.max(1, Math.round(displayWidthOverride || width));
+  const displayHeight = Math.max(1, Math.round(displayHeightOverride || height));
+  const maxWidthPx = Math.max(1, Math.round(maxWidth));
+  const maxHeightPx = Math.max(1, Math.round(maxHeight));
+  const parsedRenderScale = parseFloat(renderScale);
+  const renderScalePx = Math.max(MIN_RENDER_SCALE, Number.isFinite(parsedRenderScale) ? parsedRenderScale : 1);
+  const qualityClamped = Math.min(1, Math.max(MIN_JPEG_QUALITY, quality));
 
   const rot = ((rotation || 0) % 360 + 360) % 360;
   const srcWidth = img.width || img.naturalWidth || displayWidth;
   const srcHeight = img.height || img.naturalHeight || displayHeight;
-  const needsRotation = rot !== 0;
+  const safeSrcWidth = Math.max(1, srcWidth);
+  const safeSrcHeight = Math.max(1, srcHeight);
 
-  // If no rotation and source already meets min resolution, use original buffer to avoid recompression
-  if (!needsRotation && srcWidth >= minWidth && srcHeight >= minHeight) {
-    const mime = file.type && file.type.includes('png') ? 'image/png' : file.type || 'image/png';
-    const arrayBuffer = await file.arrayBuffer();
-    return {
-      buffer: arrayBuffer,
-      width: displayWidth,
-      height: displayHeight,
-      mime
-    };
-  }
-
-  // Otherwise, render without downscaling; upscale if below minimums
-  const scaleFactor = Math.max(minWidth / srcWidth, minHeight / srcHeight, 1);
-  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor * renderScale));
-  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor * renderScale));
+  // Limit rendering to keep .docx outputs lightweight; cap at 1920x1080.
+  const scaleFactor = Math.min(maxWidthPx / safeSrcWidth, maxHeightPx / safeSrcHeight, 1);
+  const targetWidth = Math.max(1, Math.round(safeSrcWidth * scaleFactor * renderScalePx));
+  const targetHeight = Math.max(1, Math.round(safeSrcHeight * scaleFactor * renderScalePx));
   const swap = rot === 90 || rot === 270;
   const canvasWidth = swap ? targetHeight : targetWidth;
   const canvasHeight = swap ? targetWidth : targetHeight;
@@ -77,8 +82,8 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
   }
 
-  const mime = 'image/png';
-  const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime));
+  const mime = 'image/jpeg';
+  const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime, qualityClamped));
   const arrayBuffer = await blob.arrayBuffer();
 
   return {
