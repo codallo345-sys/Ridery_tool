@@ -43,14 +43,15 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const displayHeight = Math.max(1, Math.round(displayHeightOverride || height));
   const maxWidthPx = Math.max(1, Math.round(maxWidth));
   const maxHeightPx = Math.max(1, Math.round(maxHeight));
-  const renderScalePx = Math.max(MIN_RENDER_SCALE, Number(renderScale) || 1);
+  const parsedRenderScale = parseFloat(renderScale);
+  const renderScalePx = Math.max(MIN_RENDER_SCALE, Number.isFinite(parsedRenderScale) ? parsedRenderScale : 1);
   const qualityClamped = Math.min(1, Math.max(MIN_JPEG_QUALITY, quality));
 
   const rot = ((rotation || 0) % 360 + 360) % 360;
   const srcWidth = img.width || img.naturalWidth || displayWidth;
   const srcHeight = img.height || img.naturalHeight || displayHeight;
-  const safeSrcWidth = Math.max(1, srcWidth || 0);
-  const safeSrcHeight = Math.max(1, srcHeight || 0);
+  const safeSrcWidth = Math.max(1, srcWidth);
+  const safeSrcHeight = Math.max(1, srcHeight);
 
   // Limit rendering to keep .docx outputs lightweight; cap at 1920x1080.
   const scaleFactor = Math.min(maxWidthPx / safeSrcWidth, maxHeightPx / safeSrcHeight, 1);
