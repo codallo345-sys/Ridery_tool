@@ -1,6 +1,6 @@
 // src/utils/cmcImageProcessor.js
-// Procesa una File/Image y devuelve { buffer, width, height, mime }
-// - processImageForReport(file, rotation, orientation, targetDims)
+// Processes an image File and returns { buffer, width, height, mime }
+// - processImageForReport(file, rotation, orientation, targetDims = { width, height, renderScale, maxWidth, maxHeight, quality })
 
 export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: 1, maxWidth: 1920, maxHeight: 1080, quality: 0.72 }) {
   if (!file) throw new Error('No file provided');
@@ -27,8 +27,8 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
   const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
-  const maxWidth = Math.max(1, Math.round(targetDims?.maxWidth || targetDims?.minWidth || 1920));
-  const maxHeight = Math.max(1, Math.round(targetDims?.maxHeight || targetDims?.minHeight || 1080));
+  const maxWidth = Math.max(1, Math.round(targetDims?.maxWidth || 1920));
+  const maxHeight = Math.max(1, Math.round(targetDims?.maxHeight || 1080));
   const renderScale = Math.max(1, Math.round(targetDims?.renderScale || 1));
   const quality = Math.min(1, Math.max(0.3, targetDims?.quality ?? 0.72));
 
@@ -37,7 +37,7 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const srcHeight = img.height || img.naturalHeight || displayHeight;
   const needsRotation = rot !== 0;
 
-  // Limit rendering to keep .docx outputs light; no scaling beyond ~1080p.
+  // Limit rendering to keep .docx outputs lightweight; no scaling beyond ~1080p.
   const scaleFactor = Math.min(maxWidth / srcWidth, maxHeight / srcHeight, 1);
   const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor * renderScale));
   const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor * renderScale));
