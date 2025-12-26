@@ -50,8 +50,15 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   // Otherwise, render without downscaling; upscale if below minimums
   const scaleFactor = Math.max(minWidth / srcWidth, minHeight / srcHeight, 1);
+<<<<<<< HEAD
   const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor * renderScale));
   const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor * renderScale));
+=======
+  // Only amplify with renderScale when scaling is needed; avoids inflating already large images.
+  const effectiveScale = scaleFactor > 1 ? renderScale : 1;
+  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor * effectiveScale));
+  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor * effectiveScale));
+>>>>>>> a4054c7 (Upload workspace to Ridery_tool)
   const swap = rot === 90 || rot === 270;
   const canvasWidth = swap ? targetHeight : targetWidth;
   const canvasHeight = swap ? targetWidth : targetHeight;
