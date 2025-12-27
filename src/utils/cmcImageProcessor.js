@@ -27,8 +27,9 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
   const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
-  const minWidth = Math.max(1, Math.round(targetDims?.minWidth || 1920));
-  const minHeight = Math.max(1, Math.round(targetDims?.minHeight || 1080));
+  // Keep min dimensions aligned with display targets to avoid oversizing the canvas.
+  const minWidth = Math.max(1, Math.round(targetDims?.minWidth || displayWidth));
+  const minHeight = Math.max(1, Math.round(targetDims?.minHeight || displayHeight));
   const rot = ((rotation || 0) % 360 + 360) % 360;
   const srcWidth = img.width || img.naturalWidth || displayWidth;
   const srcHeight = img.height || img.naturalHeight || displayHeight;

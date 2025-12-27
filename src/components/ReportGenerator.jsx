@@ -134,8 +134,8 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
   const targetHeightCm = targetWidthCm * (baseDims.heightCm / baseDims.widthCm);
   const targetDisplayWidthPx = Math.max(1, Math.round(targetWidthCm * CM_TO_PIXELS));
   const targetDisplayHeightPx = Math.max(1, Math.round(targetHeightCm * CM_TO_PIXELS));
-  const minWidthPx = MIN_OUTPUT_WIDTH_PX;
-  const minHeightPx = MIN_OUTPUT_HEIGHT_PX;
+  const minWidthPx = targetDisplayWidthPx;
+  const minHeightPx = targetDisplayHeightPx;
 
   const processed = await Promise.all(
     slots.map((s) =>
