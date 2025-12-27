@@ -27,16 +27,13 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
   const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
-  // Keep min dimensions aligned with display targets to avoid oversizing the canvas.
-  const minWidth = Math.max(1, Math.round(targetDims?.minWidth || displayWidth));
-  const minHeight = Math.max(1, Math.round(targetDims?.minHeight || displayHeight));
   const rot = ((rotation || 0) % 360 + 360) % 360;
   const srcWidth = img.width || img.naturalWidth || displayWidth;
   const srcHeight = img.height || img.naturalHeight || displayHeight;
   const needsRotation = rot !== 0;
 
-  // If no rotation and source already meets min resolution, use original buffer to avoid recompression
-  if (!needsRotation && srcWidth >= minWidth && srcHeight >= minHeight) {
+  // If no rotation and the source is already within target display size, reuse it to avoid recompression.
+  if (!needsRotation && srcWidth <= displayWidth && srcHeight <= displayHeight) {
     const mime = file.type && file.type.includes('png') ? 'image/png' : file.type || 'image/png';
     const arrayBuffer = await file.arrayBuffer();
     return {
@@ -47,11 +44,10 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     };
   }
 
-  // Otherwise, render without downscaling; upscale if below minimums
-  const scaleFactor = Math.max(minWidth / srcWidth, minHeight / srcHeight, 1);
-  // Avoid multiplying by renderScale to keep canvas sizes safe for Word export.
-  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor));
-  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor));
+  // Otherwise, fit the image into the target display box without upscaling.
+  const fitScale = Math.min(1, displayWidth / srcWidth, displayHeight / srcHeight);
+  const targetWidth = Math.max(1, Math.round(srcWidth * fitScale));
+  const targetHeight = Math.max(1, Math.round(srcHeight * fitScale));
   const swap = rot === 90 || rot === 270;
   const canvasWidth = swap ? targetHeight : targetWidth;
   const canvasHeight = swap ? targetWidth : targetHeight;
