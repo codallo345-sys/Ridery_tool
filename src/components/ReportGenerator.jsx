@@ -134,7 +134,6 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
   const targetHeightCm = targetWidthCm * (baseDims.heightCm / baseDims.widthCm);
   const targetDisplayWidthPx = Math.max(1, Math.round(targetWidthCm * CM_TO_PIXELS));
   const targetDisplayHeightPx = Math.max(1, Math.round(targetHeightCm * CM_TO_PIXELS));
-  const renderScale = QUALITY_RENDER_SCALE;
   const minWidthPx = MIN_OUTPUT_WIDTH_PX;
   const minHeightPx = MIN_OUTPUT_HEIGHT_PX;
 
@@ -155,7 +154,6 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
           height: Math.max(1, Math.round(baseHeight * scale)),
           displayWidth: targetDisplayWidthPx,
           displayHeight: targetDisplayHeightPx,
-          renderScale,
           minWidth: minWidthPx,
           minHeight: minHeightPx
         };

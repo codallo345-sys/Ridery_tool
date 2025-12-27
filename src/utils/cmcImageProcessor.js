@@ -2,7 +2,7 @@
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
 
-export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: 1, minWidth: 1920, minHeight: 1080 }) {
+export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, minWidth: 1920, minHeight: 1080 }) {
   if (!file) throw new Error('No file provided');
 
   const loadImage = (file) => new Promise((resolve, reject) => {
