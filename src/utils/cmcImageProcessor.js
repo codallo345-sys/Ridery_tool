@@ -2,6 +2,13 @@
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
 const DEFAULT_RENDER_SCALE = 1.5;
+const MAX_BLOB_SIZE_BYTES = 25 * 1024 * 1024;
+const MIN_JPEG_QUALITY = 0.55;
+const AGGRESSIVE_QUALITY_STEP = 0.6;
+const NORMAL_QUALITY_STEP = 0.8;
+const MAX_COMPRESSION_STEPS = 8;
+const AGGRESSIVE_THRESHOLD_MULTIPLIER = 2;
+const MIN_RATIO_DIVISOR = 1.1;
 
 export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: DEFAULT_RENDER_SCALE }) {
   if (!file) throw new Error('No file provided');
@@ -29,8 +36,10 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
   const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
   const renderScale = Math.max(0.1, Number(targetDims?.renderScale || DEFAULT_RENDER_SCALE));
-  const maxRenderWidth = Math.max(displayWidth, Math.round(displayWidth * renderScale));
-  const maxRenderHeight = Math.max(displayHeight, Math.round(displayHeight * renderScale));
+  const minRenderWidth = Math.round(targetDims?.minWidth || 0);
+  const minRenderHeight = Math.round(targetDims?.minHeight || 0);
+  const maxRenderWidth = Math.max(minRenderWidth, Math.round(displayWidth * renderScale), displayWidth);
+  const maxRenderHeight = Math.max(minRenderHeight, Math.round(displayHeight * renderScale), displayHeight);
 
   const rot = ((rotation || 0) % 360 + 360) % 360;
   const srcWidth = img.width || img.naturalWidth || displayWidth;
@@ -68,7 +77,26 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   }
 
   const mime = 'image/jpeg';
-  const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime, 0.82));
+  const toBlobOrThrow = async (q) => {
+    const b = await new Promise((resolve, reject) => canvas.toBlob((blobResult) => {
+      if (blobResult) resolve(blobResult); else reject(new Error('Unable to process image'));
+    }, mime, q));
+    return b;
+  };
+  const computeNextQuality = (currentQuality, sizeRatio) => {
+    const step = sizeRatio > AGGRESSIVE_THRESHOLD_MULTIPLIER ? AGGRESSIVE_QUALITY_STEP : NORMAL_QUALITY_STEP;
+    const projectedQuality = Math.max(MIN_JPEG_QUALITY, currentQuality / Math.max(MIN_RATIO_DIVISOR, sizeRatio));
+    return Math.max(MIN_JPEG_QUALITY, Math.min(projectedQuality, currentQuality * step));
+  };
+  let quality = 0.9;
+  let blob = await toBlobOrThrow(quality);
+  let attempts = 0;
+  while (blob.size > MAX_BLOB_SIZE_BYTES && quality > MIN_JPEG_QUALITY && attempts < MAX_COMPRESSION_STEPS) {
+    const ratio = blob.size / MAX_BLOB_SIZE_BYTES;
+    quality = computeNextQuality(quality, ratio);
+    blob = await toBlobOrThrow(quality);
+    attempts += 1;
+  }
   const arrayBuffer = await blob.arrayBuffer();
 
   // Adjust display dimensions respecting the real aspect ratio to avoid distortion
