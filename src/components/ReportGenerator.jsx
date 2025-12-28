@@ -181,8 +181,11 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
       spacing: { after: 40 }
     });
 
+    const displayWidth = result.displayWidth || result.width;
+    const displayHeight = result.displayHeight || result.height;
+
     const imageParagraph = new Paragraph({
-      children: [new ImageRun({ data: result.buffer, transformation: { width: result.width, height: result.height }, type: imageType })],
+      children: [new ImageRun({ data: result.buffer, transformation: { width: displayWidth, height: displayHeight }, type: imageType })],
       alignment: AlignmentType.CENTER,
       spacing: { after: 80 }
     });
