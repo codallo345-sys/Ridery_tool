@@ -38,7 +38,7 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const limitedScale = (srcWidth > 0 && srcHeight > 0)
     ? Math.min(maxRenderWidth / srcWidth, maxRenderHeight / srcHeight)
     : 1;
-  const scaleFactor = Math.min(1, limitedScale || 1);
+  const scaleFactor = Math.min(1, limitedScale);
   const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor));
   const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor));
   const swap = rot === 90 || rot === 270;
@@ -81,10 +81,12 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   return {
     buffer: arrayBuffer,
-    width: canvasWidth,
-    height: canvasHeight,
+    width: displayW,
+    height: displayH,
     displayWidth: displayW,
     displayHeight: displayH,
+    renderWidth: canvasWidth,
+    renderHeight: canvasHeight,
     mime
   };
 }
