@@ -27,7 +27,7 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
   const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
-  const renderScale = Math.max(1, Number(targetDims?.renderScale || 1.5));
+  const renderScale = Math.max(0.1, Number(targetDims?.renderScale || 1.5));
   const maxRenderWidth = Math.max(displayWidth, Math.round(displayWidth * renderScale));
   const maxRenderHeight = Math.max(displayHeight, Math.round(displayHeight * renderScale));
 
@@ -35,7 +35,10 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const srcWidth = img.width || img.naturalWidth || displayWidth;
   const srcHeight = img.height || img.naturalHeight || displayHeight;
   const needsRotation = rot !== 0;
-  const scaleFactor = Math.min(1, Math.min(maxRenderWidth / srcWidth, maxRenderHeight / srcHeight) || 1);
+  const limitedScale = (srcWidth > 0 && srcHeight > 0)
+    ? Math.min(maxRenderWidth / srcWidth, maxRenderHeight / srcHeight)
+    : 1;
+  const scaleFactor = Math.min(1, limitedScale || 1);
   const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor));
   const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor));
   const swap = rot === 90 || rot === 270;
@@ -67,7 +70,7 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), mime, 0.82));
   const arrayBuffer = await blob.arrayBuffer();
 
-  // Ajustar dimensiones de despliegue respetando el aspecto real para evitar "aplastado"
+  // Adjust display dimensions respecting the real aspect ratio to avoid distortion
   const aspectRatio = canvasHeight / canvasWidth;
   let displayW = displayWidth;
   let displayH = Math.max(1, Math.round(displayW * aspectRatio));
