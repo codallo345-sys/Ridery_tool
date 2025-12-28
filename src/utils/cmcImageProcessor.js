@@ -1,8 +1,9 @@
 // src/utils/cmcImageProcessor.js
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
+const DEFAULT_RENDER_SCALE = 1.5;
 
-export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: 1.5 }) {
+export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: DEFAULT_RENDER_SCALE }) {
   if (!file) throw new Error('No file provided');
 
   const loadImage = (file) => new Promise((resolve, reject) => {
@@ -27,7 +28,7 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
 
   const displayWidth = Math.max(1, Math.round(targetDims?.displayWidth || targetDims?.width || 800));
   const displayHeight = Math.max(1, Math.round(targetDims?.displayHeight || targetDims?.height || 600));
-  const renderScale = Math.max(0.1, Number(targetDims?.renderScale || 1.5));
+  const renderScale = Math.max(0.1, Number(targetDims?.renderScale || DEFAULT_RENDER_SCALE));
   const maxRenderWidth = Math.max(displayWidth, Math.round(displayWidth * renderScale));
   const maxRenderHeight = Math.max(displayHeight, Math.round(displayHeight * renderScale));
 
@@ -83,8 +84,6 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     buffer: arrayBuffer,
     width: displayW,
     height: displayH,
-    displayWidth: displayW,
-    displayHeight: displayH,
     renderWidth: canvasWidth,
     renderHeight: canvasHeight,
     mime
