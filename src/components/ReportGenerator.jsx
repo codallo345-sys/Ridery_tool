@@ -16,6 +16,7 @@ import CompactCalculator from './CompactCalculator';
 import RecalculationGuide from './RecalculationGuide';
 import RecalculationPanel from './RecalculationPanel';
 import CategoryPanel from './CategoryPanel';
+import FormulaEditor from './FormulaEditor';
 import { nanoid } from 'nanoid';
 import AddIcon from '@mui/icons-material/Add';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -27,6 +28,7 @@ import pLimit from 'p-limit';
 
 // Firestore helpers
 import { saveGuia, subscribeToGuias } from '../lib/data/guias';
+import { createFormula, updateFormula, subscribeToFormulas } from '../lib/data/formulas';
 import { guideNameToSlug } from '../utils/guideSlugMap';
 
 const createNewSlot = (title = 'Evidencia Adicional') => ({
@@ -117,6 +119,19 @@ Uso:
 
   // Mensajes por defecto si no hay guía específica
   "DEFAULT": `No hay guía específica para esta incidencia. Si eres administrador, puedes agregar una guía detallada para este caso.`
+};
+
+const DEFAULT_FORMULAS = {
+  DEFAULT: 'No hay fórmula definida para esta incidencia. Si eres administrador, agrega la fórmula o regla de cálculo aquí.'
+};
+
+const normalizeFormulaMap = (raw = {}) => {
+  const normalized = {};
+  Object.entries(raw).forEach(([k, v]) => {
+    if (!k) return;
+    normalized[String(k).toUpperCase()] = v;
+  });
+  return normalized;
 };
 
 // --- funciones para generar tablas de imágenes (.docx) ---
@@ -252,6 +267,15 @@ export default function ReportGenerator({ currentOption }) {
     }
   });
 
+  const [formulaMap, setFormulaMap] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('cmc_formulas') || '{}');
+      return normalizeFormulaMap(stored);
+    } catch (e) {
+      return {};
+    }
+  });
+
   const [isAdmin, setIsAdmin] = useState(() => !!localStorage.getItem('cmc_is_admin'));
 
   // Suscripción a Firestore para traer guías y rellenar guideMap
@@ -269,6 +293,29 @@ export default function ReportGenerator({ currentOption }) {
       });
     } catch (e) {
       console.warn('subscribeToGuides failed', e);
+    }
+    return () => { if (unsub) unsub(); };
+  }, []);
+
+  // Suscripción a Firestore para fórmulas
+  useEffect(() => {
+    let unsub = null;
+    try {
+      unsub = subscribeToFormulas((docs) => {
+        const map = {};
+        docs.forEach((d) => {
+          const key = String((d.slug || d.name || '')).trim().toUpperCase();
+          if (!key) return;
+          map[key] = { ...d };
+        });
+        setFormulaMap((prev) => {
+          const merged = { ...prev, ...map };
+          try { localStorage.setItem('cmc_formulas', JSON.stringify(merged)); } catch (e) {}
+          return merged;
+        });
+      });
+    } catch (e) {
+      console.warn('subscribeToFormulas failed', e);
     }
     return () => { if (unsub) unsub(); };
   }, []);
@@ -308,6 +355,40 @@ export default function ReportGenerator({ currentOption }) {
     } catch (e) {
       console.error(e);
       alert('Error guardando guía.');
+    }
+  };
+
+  const handleFormulaSave = async (optionKey, newExpression) => {
+    if (!localStorage.getItem('cmc_is_admin')) { alert('Solo admin puede guardar fórmulas.'); return; }
+    const key = String(optionKey || '').trim().toUpperCase();
+    const existing = formulaMap[key];
+    try {
+      let saved = existing;
+      if (existing?.id) {
+        await updateFormula(existing.id, {
+          expression: newExpression,
+          name: optionKey,
+          description: existing?.description || '',
+          isActive: existing?.isActive ?? true,
+        });
+        saved = { ...existing, expression: newExpression };
+      } else {
+        const created = await createFormula({
+          name: optionKey,
+          expression: newExpression,
+          description: existing?.description || '',
+          isActive: true,
+        });
+        saved = created;
+      }
+      setFormulaMap(prev => {
+        const updated = { ...prev, [key]: saved };
+        try { localStorage.setItem('cmc_formulas', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+    } catch (e) {
+      console.error(e);
+      alert('Error guardando fórmula.');
     }
   };
 
@@ -433,6 +514,8 @@ export default function ReportGenerator({ currentOption }) {
   };
 
   const guideHtml = pickGuideHtml();
+  const formulaKey = (currentOption?.name || '').trim().toUpperCase();
+  const formulaValue = (formulaMap[formulaKey]?.expression) || DEFAULT_FORMULAS[formulaKey] || DEFAULT_FORMULAS.DEFAULT;
 
   return (
     <Container
@@ -529,6 +612,15 @@ export default function ReportGenerator({ currentOption }) {
               }}>
                 <RecalculationGuide guideKey={currentOption?.name || 'GUIDE'} title={currentOption?.name || 'Guía'} content={guideHtml} isAdmin={isAdmin} onSave={handleGuideSave} />
               </Paper>
+            )}
+
+            {!isRecalculoPanel && !isCategoryPanel && (
+              <FormulaEditor
+                optionName={currentOption?.name || ''}
+                value={formulaValue}
+                onSave={handleFormulaSave}
+                isAdmin={isAdmin}
+              />
             )}
 
             {!isRecalculoPanel && !isCategoryPanel && showCalculator && (
