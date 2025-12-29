@@ -40,10 +40,10 @@ const PAGE_WIDTH_CM = 21; // A4 width in cm (used to bound tables)
 const PAGE_WIDTH_TWIPS = Math.round(PAGE_WIDTH_CM * CM_TO_TWIPS); // ~21 cm page width to bound table width
 const PAGE_MARGIN_CM = 1.27; // 0.5 in
 const PAGE_MARGIN_TWIPS = Math.round(PAGE_MARGIN_CM * CM_TO_TWIPS);  // aligns with section page.margin defined in the Document
-const COLS_PER_ROW = 4; // fixed 4 images per row as requested
+const COLS_PER_ROW = 3; // 3 images per row
 const BASE_DIMS_CM = {
-  horizontal: { widthCm: 6.17, heightCm: 3.12 },
-  vertical: { widthCm: 4.6, heightCm: 9.55 }
+  horizontal: { widthCm: 6.56, heightCm: 6.56 },
+  vertical: { widthCm: 6.56, heightCm: 6.56 }
 };
 const QUALITY_RENDER_SCALE = 3; // render at higher resolution to improve clarity in Word
 const MIN_OUTPUT_WIDTH_PX = 1920;

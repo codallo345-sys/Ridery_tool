@@ -2,7 +2,7 @@
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
 const DEFAULT_RENDER_SCALE = 1.5;
-const MAX_BLOB_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_BLOB_SIZE_BYTES = 20 * 1024 * 1024;
 const MIN_JPEG_QUALITY = 0.55;
 const AGGRESSIVE_QUALITY_STEP = 0.6;
 const NORMAL_QUALITY_STEP = 0.8;
