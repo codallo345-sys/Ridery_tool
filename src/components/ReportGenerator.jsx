@@ -4,6 +4,7 @@ import {
   Document, Packer, Paragraph, ImageRun, TextRun, AlignmentType,
   Table, TableRow, TableCell, WidthType, BorderStyle
 } from 'docx';
+import { PDFDocument } from 'pdf-lib';
 import { saveAs } from 'file-saver';
 import {
   Container, Button, Grid, Typography, Box, Paper, Chip,
@@ -120,7 +121,7 @@ Uso:
 };
 
 // --- funciones para generar tablas de imágenes (.docx) ---
-const generateImageTableForGroup = async (slots, cols, orientation, docChildren, onProgress) => {
+const generateImageTableForGroup = async (slots, cols, orientation, docChildren, onProgress, pdfCollector) => {
   if (!slots || slots.length === 0) return;
   const safeCols = Math.max(1, cols || 1);
   const limit = pLimit(CONCURRENCY_LIMIT);
@@ -160,6 +161,7 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
           minHeight: minHeightPx
         };
         const result = await processImageForReport(s.file, s.rotation || 0, s.orientation || 'horizontal', targetDims);
+        if (pdfCollector) pdfCollector.push({ slot: s, result });
         if (onProgress) onProgress();
         return { slot: s, result, dims };
       })
@@ -336,6 +338,21 @@ export default function ReportGenerator({ currentOption }) {
     return null;
   };
 
+  const buildPdfFromImages = async (images) => {
+    if (!images || images.length === 0) return;
+    const pdfDoc = await PDFDocument.create();
+    for (const { result } of images) {
+      const bytes = new Uint8Array(result.buffer);
+      const isPng = result.mime && result.mime.toLowerCase().includes('png');
+      const pdfImage = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+      const page = pdfDoc.addPage([pdfImage.width, pdfImage.height]);
+      page.drawImage(pdfImage, { x: 0, y: 0, width: pdfImage.width, height: pdfImage.height });
+    }
+    const pdfBytes = await pdfDoc.save();
+    const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+    saveAs(pdfBlob, `Reporte_CMC_${Date.now()}_HD.pdf`);
+  };
+
   const handleGenerateWord = async () => {
     const validSlots = slots.filter(s => s.file);
     if (validSlots.length === 0) { alert('Sube al menos una imagen.'); return; }
@@ -345,6 +362,7 @@ export default function ReportGenerator({ currentOption }) {
     setTotalToProcess(validSlots.length);
 
     try {
+      const pdfImages = [];
       const docChildren = [];
 
       docChildren.push(new Paragraph({
@@ -377,9 +395,9 @@ export default function ReportGenerator({ currentOption }) {
         const bySize = { normal: [], mediana: [], grande: [] };
         arr.forEach(s => bySize[s.size || 'normal'].push(s));
 
-        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, COLS_PER_ROW, orientation, docChildren, onProgress);
-        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, COLS_PER_ROW, orientation, docChildren, onProgress);
-        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, COLS_PER_ROW, orientation, docChildren, onProgress);
+        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, COLS_PER_ROW, orientation, docChildren, onProgress, pdfImages);
+        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, COLS_PER_ROW, orientation, docChildren, onProgress, pdfImages);
+        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, COLS_PER_ROW, orientation, docChildren, onProgress, pdfImages);
       };
 
       const onProgress = () => setProcessedCount(p => p + 1);
@@ -398,6 +416,7 @@ export default function ReportGenerator({ currentOption }) {
 
       const blob = await Packer.toBlob(doc);
       saveAs(blob, `Reporte_CMC_${Date.now()}.docx`);
+      await buildPdfFromImages(pdfImages);
       setSnackOpen(true);
     } catch (error) {
       console.error(error);
