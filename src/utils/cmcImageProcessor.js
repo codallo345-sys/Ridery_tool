@@ -48,7 +48,10 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const limitedScale = (srcWidth > 0 && srcHeight > 0)
     ? Math.min(maxRenderWidth / srcWidth, maxRenderHeight / srcHeight)
     : 1;
-  const MAX_UPSCALE_FACTOR = Math.max(maxRenderWidth, maxRenderHeight); // explicit finite bound (~4K)
+  const MAX_UPSCALE_FACTOR = Math.max(
+    maxRenderWidth / Math.max(srcWidth, 1),
+    maxRenderHeight / Math.max(srcHeight, 1)
+  ); // ratio-bound cap derived from 4K limits
   const scaleFactor = Math.min(limitedScale, MAX_UPSCALE_FACTOR); // allows upscaling to 4K while still downscaling when inputs exceed the bounds
   const targetWidth = Math.max(1, Math.round(Math.min(maxRenderWidth, srcWidth * scaleFactor)));
   const targetHeight = Math.max(1, Math.round(Math.min(maxRenderHeight, srcHeight * scaleFactor)));
