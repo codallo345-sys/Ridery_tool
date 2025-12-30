@@ -3,11 +3,7 @@
 // - processImageForReport(file, rotation, orientation, targetDims)
 const DEFAULT_RENDER_SCALE = 3;
 const MAX_BLOB_SIZE_BYTES = 60 * 1024 * 1024;
-const MIN_JPEG_QUALITY = 0.55;
-const AGGRESSIVE_QUALITY_STEP = 0.6;
-const NORMAL_QUALITY_STEP = 0.8;
 const MAX_COMPRESSION_STEPS = 8;
-const AGGRESSIVE_THRESHOLD_MULTIPLIER = 2;
 const MIN_RATIO_DIVISOR = 1.1;
 
 export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: DEFAULT_RENDER_SCALE }) {
@@ -82,11 +78,6 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
       if (blobResult) resolve(blobResult); else reject(new Error('Unable to process image'));
     }, mime));
     return b;
-  };
-  const computeNextQuality = (currentQuality, sizeRatio) => {
-    const step = sizeRatio > AGGRESSIVE_THRESHOLD_MULTIPLIER ? AGGRESSIVE_QUALITY_STEP : NORMAL_QUALITY_STEP;
-    const projectedQuality = Math.max(MIN_JPEG_QUALITY, currentQuality / Math.max(MIN_RATIO_DIVISOR, sizeRatio));
-    return Math.max(MIN_JPEG_QUALITY, Math.min(projectedQuality, currentQuality * step));
   };
   let blob = await toBlobOrThrow();
   let attempts = 0;
