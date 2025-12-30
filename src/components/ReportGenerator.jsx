@@ -7,7 +7,7 @@ import {
 import { saveAs } from 'file-saver';
 import {
   Container, Button, Grid, Typography, Box, Paper, Chip,
-  LinearProgress, Snackbar, Alert, Tabs, Tab
+  LinearProgress, Snackbar, Alert, Tabs, Tab, TextField
 } from '@mui/material';
 import ImageSlot from './ImageSlot';
 import { processImageForReport } from '../utils/cmcImageProcessor';
@@ -45,9 +45,9 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.56, heightCm: 6.56 },
   vertical: { widthCm: 6.56, heightCm: 6.56 }
 };
-const QUALITY_RENDER_SCALE = 3; // render at higher resolution to improve clarity in Word
-const MIN_OUTPUT_WIDTH_PX = 1920;
-const MIN_OUTPUT_HEIGHT_PX = 1080;
+const QUALITY_RENDER_SCALE = 4; // render at higher resolution to improve clarity in Word
+const MIN_OUTPUT_WIDTH_PX = 2560;
+const MIN_OUTPUT_HEIGHT_PX = 1440;
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -238,6 +238,7 @@ export default function ReportGenerator({ currentOption }) {
   const slotsEndRef = useRef(null);
 
   const [snackOpen, setSnackOpen] = useState(false);
+  const [reportTitle, setReportTitle] = useState('');
 
   const [calcState, setCalcState] = useState({
     amountAdmin: 0, cashGiven: 0, amountReal: 0, surgeAdmin: 1, surgeReal: 1, surgeType: 'none', cashGivenAdmin: 0, realCashGiven: 0
@@ -279,6 +280,7 @@ export default function ReportGenerator({ currentOption }) {
     let initialSlots = requiredItems.map(itemTitle => createNewSlot(itemTitle));
     if (initialSlots.length === 0) initialSlots.push(createNewSlot('Evidencia Principal'));
     setSlots(initialSlots);
+    setReportTitle(currentOption?.name ? String(currentOption.name) : '');
     setSnackOpen(false);
     setCalcState({
       amountAdmin: 0, cashGiven: 0, amountReal: 0, surgeAdmin: 1, surgeReal: 1, surgeType: 'none', cashGivenAdmin: 0, realCashGiven: 0
@@ -339,6 +341,8 @@ export default function ReportGenerator({ currentOption }) {
   const handleGenerateWord = async () => {
     const validSlots = slots.filter(s => s.file);
     if (validSlots.length === 0) { alert('Sube al menos una imagen.'); return; }
+    const safeTitle = (reportTitle || currentOption?.name || 'CMC').trim();
+    const fileSafeName = safeTitle.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_') || 'Reporte_CMC';
 
     setLoading(true);
     setProcessedCount(0);
@@ -355,7 +359,7 @@ export default function ReportGenerator({ currentOption }) {
 
       if (currentOption) {
         docChildren.push(new Paragraph({
-          children: [new TextRun({ text: `CASO: ${currentOption.name}`, bold: true, size: 24, font: 'Calibri' })],
+          children: [new TextRun({ text: `CASO: ${safeTitle}`, bold: true, size: 24, font: 'Calibri' })],
           spacing: { after: 60 }
         }));
         const ticket = extractTicketFromSlots(validSlots);
@@ -397,7 +401,7 @@ export default function ReportGenerator({ currentOption }) {
       });
 
       const blob = await Packer.toBlob(doc);
-      saveAs(blob, `Reporte_CMC_${Date.now()}.docx`);
+      saveAs(blob, `${fileSafeName}_${Date.now()}.docx`);
       setSnackOpen(true);
     } catch (error) {
       console.error(error);
@@ -639,6 +643,19 @@ export default function ReportGenerator({ currentOption }) {
           border: '1px solid rgba(135,252,217,0.3)',
           boxShadow: '0 20px 60px rgba(0,0,0,0.45)'
         }}>
+          <TextField
+            size="small"
+            label="Título del reporte"
+            value={reportTitle}
+            onChange={(e) => setReportTitle(e.target.value)}
+            sx={{
+              minWidth: { xs: 200, sm: 260 },
+              '& .MuiInputBase-input': { color: '#e5e7eb', fontWeight: 700 },
+              '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+              '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(135,252,217,0.35)' },
+              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#87fcd9' }
+            }}
+          />
           <Button
             variant="text"
             startIcon={<AddIcon />}
