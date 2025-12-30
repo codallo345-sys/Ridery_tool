@@ -45,9 +45,9 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.56, heightCm: 6.56 },
   vertical: { widthCm: 6.56, heightCm: 6.56 }
 };
-const QUALITY_RENDER_SCALE = 4; // render at higher resolution to improve clarity in Word
-const MIN_OUTPUT_WIDTH_PX = 2560;
-const MIN_OUTPUT_HEIGHT_PX = 1440;
+const QUALITY_RENDER_SCALE = 5; // render at higher resolution to improve clarity in Word
+const MIN_OUTPUT_WIDTH_PX = 3200;
+const MIN_OUTPUT_HEIGHT_PX = 1800;
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -582,8 +582,23 @@ export default function ReportGenerator({ currentOption }) {
 
         {!isRecalculoPanel && !isCategoryPanel ? (
           <Grid item xs={12} lg={8}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, alignItems: 'center' }}>
-              <Typography variant="h6" sx={{ color: 'white', letterSpacing: 0.2 }}>Evidencias ({slots.length})</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 2, gap: 2, flexWrap: 'wrap' }}>
+              <Typography variant="h6" sx={{ color: 'white', letterSpacing: 0.2, textAlign: 'center' }}>
+                Evidencias ({slots.length})
+              </Typography>
+              <TextField
+                size="small"
+                label="Título del reporte"
+                value={reportTitle}
+                onChange={(e) => setReportTitle(e.target.value)}
+                sx={{
+                  minWidth: { xs: 220, sm: 260 },
+                  '& .MuiInputBase-input': { color: '#e5e7eb', fontWeight: 700 },
+                  '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(135,252,217,0.35)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#87fcd9' }
+                }}
+              />
             </Box>
 
             <Grid container spacing={2.5}>
@@ -643,19 +658,6 @@ export default function ReportGenerator({ currentOption }) {
           border: '1px solid rgba(135,252,217,0.3)',
           boxShadow: '0 20px 60px rgba(0,0,0,0.45)'
         }}>
-          <TextField
-            size="small"
-            label="Título del reporte"
-            value={reportTitle}
-            onChange={(e) => setReportTitle(e.target.value)}
-            sx={{
-              minWidth: { xs: 200, sm: 260 },
-              '& .MuiInputBase-input': { color: '#e5e7eb', fontWeight: 700 },
-              '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(135,252,217,0.35)' },
-              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#87fcd9' }
-            }}
-          />
           <Button
             variant="text"
             startIcon={<AddIcon />}
