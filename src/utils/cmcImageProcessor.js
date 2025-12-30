@@ -90,10 +90,8 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   };
   let blob = await toBlobOrThrow();
   let attempts = 0;
-  let quality = 0.9;
   while (blob.size > MAX_BLOB_SIZE_BYTES && attempts < MAX_COMPRESSION_STEPS) {
     const ratio = blob.size / MAX_BLOB_SIZE_BYTES;
-    quality = computeNextQuality(quality, ratio);
     // For PNG, recompress by downscaling slightly if strictly necessary
     const scaleAdjust = Math.max(0.5, 1 / Math.max(MIN_RATIO_DIVISOR, ratio));
     const resizedWidth = Math.max(1, Math.round(canvas.width * scaleAdjust));
