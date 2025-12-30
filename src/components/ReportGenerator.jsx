@@ -345,7 +345,10 @@ export default function ReportGenerator({ currentOption }) {
       for (const { result } of images) {
         const bytes = new Uint8Array(result.buffer);
         const mime = (result.mime || 'image/jpeg').toLowerCase();
-        const pdfImage = mime.includes('png') ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+        const isPng = mime.includes('png');
+        const isJpeg = mime.includes('jpg') || mime.includes('jpeg');
+        if (!isPng && !isJpeg) throw new Error(`Unsupported image format for PDF: ${mime || 'unknown'}`);
+        const pdfImage = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
         const pageWidth = result.renderWidth || pdfImage.width;
         const pageHeight = result.renderHeight || pdfImage.height;
         const page = pdfDoc.addPage([pageWidth, pageHeight]);
@@ -355,7 +358,7 @@ export default function ReportGenerator({ currentOption }) {
       const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
       saveAs(pdfBlob, `Reporte_CMC_${Date.now()}_HD.pdf`);
     } catch (err) {
-      console.error(err);
+      console.error(`PDF HD generation failed for ${images.length} imágenes`, err);
       throw err;
     }
   };
