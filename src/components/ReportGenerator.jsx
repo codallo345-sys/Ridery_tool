@@ -45,9 +45,9 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.56, heightCm: 6.56 },
   vertical: { widthCm: 6.56, heightCm: 6.56 }
 };
-const QUALITY_RENDER_SCALE = 3; // render at higher resolution to improve clarity in Word
-const MIN_OUTPUT_WIDTH_PX = 3840; // 4K width target
-const MIN_OUTPUT_HEIGHT_PX = 2160; // 4K height target
+const QUALITY_RENDER_SCALE = 4; // render at even higher resolution to improve clarity in Word
+const MIN_OUTPUT_WIDTH_PX = 7680; // 8K width target
+const MIN_OUTPUT_HEIGHT_PX = 4320; // 8K height target
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
