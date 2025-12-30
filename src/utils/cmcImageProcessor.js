@@ -1,8 +1,8 @@
 // src/utils/cmcImageProcessor.js
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
-const DEFAULT_RENDER_SCALE = 4;
-const MAX_BLOB_SIZE_BYTES = 80 * 1024 * 1024;
+const DEFAULT_RENDER_SCALE = 5;
+const MAX_BLOB_SIZE_BYTES = 100 * 1024 * 1024;
 const MAX_COMPRESSION_STEPS = 8;
 const MIN_RATIO_DIVISOR = 1.1;
 
