@@ -2,7 +2,7 @@
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
 const DEFAULT_RENDER_SCALE = 1.5;
-const MAX_BLOB_SIZE_BYTES = Infinity;
+const MAX_BLOB_SIZE_BYTES = 50 * 1024 * 1024; // 50MB cap to prevent runaway file sizes while keeping 4K quality
 const MIN_JPEG_QUALITY = 0.55;
 const AGGRESSIVE_QUALITY_STEP = 0.6;
 const NORMAL_QUALITY_STEP = 0.8;
@@ -49,8 +49,8 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     ? Math.min(maxRenderWidth / srcWidth, maxRenderHeight / srcHeight)
     : 1;
   const scaleFactor = Math.max(limitedScale, 0); // bounded by maxRenderWidth/maxRenderHeight (~4K target)
-  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor));
-  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor));
+  const targetWidth = Math.max(1, Math.round(Math.min(maxRenderWidth, srcWidth * scaleFactor)));
+  const targetHeight = Math.max(1, Math.round(Math.min(maxRenderHeight, srcHeight * scaleFactor)));
   const swap = rot === 90 || rot === 270;
   const canvasWidth = swap ? targetHeight : targetWidth;
   const canvasHeight = swap ? targetWidth : targetHeight;
