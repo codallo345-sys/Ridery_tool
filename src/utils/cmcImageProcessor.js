@@ -49,8 +49,8 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     ? Math.min(maxRenderWidth / srcWidth, maxRenderHeight / srcHeight)
     : 1;
   const scaleFactor = limitedScale; // bounded by maxRenderWidth/maxRenderHeight (~4K target)
-  const targetWidth = Math.max(1, Math.round(Math.min(maxRenderWidth, srcWidth * scaleFactor)));
-  const targetHeight = Math.max(1, Math.round(Math.min(maxRenderHeight, srcHeight * scaleFactor)));
+  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor));
+  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor));
   const swap = rot === 90 || rot === 270;
   const canvasWidth = swap ? targetHeight : targetWidth;
   const canvasHeight = swap ? targetWidth : targetHeight;
