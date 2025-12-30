@@ -340,17 +340,29 @@ export default function ReportGenerator({ currentOption }) {
 
   const buildPdfFromImages = async (images) => {
     if (!images || images.length === 0) return;
-    const pdfDoc = await PDFDocument.create();
-    for (const { result } of images) {
-      const bytes = new Uint8Array(result.buffer);
-      const isPng = result.mime && result.mime.toLowerCase().includes('png');
-      const pdfImage = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
-      const page = pdfDoc.addPage([pdfImage.width, pdfImage.height]);
-      page.drawImage(pdfImage, { x: 0, y: 0, width: pdfImage.width, height: pdfImage.height });
+    try {
+      const pdfDoc = await PDFDocument.create();
+      for (const { result } of images) {
+        const bytes = new Uint8Array(result.buffer);
+        const mime = (result.mime || 'image/jpeg').toLowerCase();
+        let pdfImage;
+        if (mime.includes('png')) {
+          pdfImage = await pdfDoc.embedPng(bytes);
+        } else if (mime.includes('jpg') || mime.includes('jpeg')) {
+          pdfImage = await pdfDoc.embedJpg(bytes);
+        } else {
+          throw new Error(`Unsupported image format for PDF: ${mime}`);
+        }
+        const page = pdfDoc.addPage([pdfImage.width, pdfImage.height]);
+        page.drawImage(pdfImage, { x: 0, y: 0, width: pdfImage.width, height: pdfImage.height });
+      }
+      const pdfBytes = await pdfDoc.save();
+      const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+      saveAs(pdfBlob, `Reporte_CMC_${Date.now()}_HD.pdf`);
+    } catch (err) {
+      console.error(err);
+      throw err;
     }
-    const pdfBytes = await pdfDoc.save();
-    const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-    saveAs(pdfBlob, `Reporte_CMC_${Date.now()}_HD.pdf`);
   };
 
   const handleGenerateWord = async () => {
@@ -416,8 +428,14 @@ export default function ReportGenerator({ currentOption }) {
 
       const blob = await Packer.toBlob(doc);
       saveAs(blob, `Reporte_CMC_${Date.now()}.docx`);
-      await buildPdfFromImages(pdfImages);
-      setSnackOpen(true);
+      let pdfOk = true;
+      try {
+        await buildPdfFromImages(pdfImages);
+      } catch (err) {
+        pdfOk = false;
+        alert('El PDF HD no pudo generarse. El .docx sí se descargó.');
+      }
+      if (pdfOk) setSnackOpen(true);
     } catch (error) {
       console.error(error);
       alert('Error al generar reporte.');
