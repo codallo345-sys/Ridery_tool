@@ -345,14 +345,7 @@ export default function ReportGenerator({ currentOption }) {
       for (const { result } of images) {
         const bytes = new Uint8Array(result.buffer);
         const mime = (result.mime || 'image/jpeg').toLowerCase();
-        let pdfImage;
-        if (mime.includes('png')) {
-          pdfImage = await pdfDoc.embedPng(bytes);
-        } else if (mime.includes('jpg') || mime.includes('jpeg')) {
-          pdfImage = await pdfDoc.embedJpg(bytes);
-        } else {
-          throw new Error(`Unsupported image format for PDF: ${mime}`);
-        }
+        const pdfImage = mime.includes('png') ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
         const pageWidth = result.renderWidth || pdfImage.width;
         const pageHeight = result.renderHeight || pdfImage.height;
         const page = pdfDoc.addPage([pageWidth, pageHeight]);
