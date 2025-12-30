@@ -1,8 +1,8 @@
 // src/utils/cmcImageProcessor.js
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
-const DEFAULT_RENDER_SCALE = 2.5;
-const MAX_BLOB_SIZE_BYTES = 40 * 1024 * 1024;
+const DEFAULT_RENDER_SCALE = 3;
+const MAX_BLOB_SIZE_BYTES = 60 * 1024 * 1024;
 const MIN_JPEG_QUALITY = 0.55;
 const AGGRESSIVE_QUALITY_STEP = 0.6;
 const NORMAL_QUALITY_STEP = 0.8;
@@ -76,11 +76,11 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
   }
 
-  const mime = 'image/jpeg';
-  const toBlobOrThrow = async (q) => {
+  const mime = 'image/png';
+  const toBlobOrThrow = async () => {
     const b = await new Promise((resolve, reject) => canvas.toBlob((blobResult) => {
       if (blobResult) resolve(blobResult); else reject(new Error('Unable to process image'));
-    }, mime, q));
+    }, mime));
     return b;
   };
   const computeNextQuality = (currentQuality, sizeRatio) => {
@@ -88,13 +88,28 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     const projectedQuality = Math.max(MIN_JPEG_QUALITY, currentQuality / Math.max(MIN_RATIO_DIVISOR, sizeRatio));
     return Math.max(MIN_JPEG_QUALITY, Math.min(projectedQuality, currentQuality * step));
   };
-  let quality = 0.9;
-  let blob = await toBlobOrThrow(quality);
+  let blob = await toBlobOrThrow();
   let attempts = 0;
-  while (blob.size > MAX_BLOB_SIZE_BYTES && quality > MIN_JPEG_QUALITY && attempts < MAX_COMPRESSION_STEPS) {
+  let quality = 0.9;
+  while (blob.size > MAX_BLOB_SIZE_BYTES && attempts < MAX_COMPRESSION_STEPS) {
     const ratio = blob.size / MAX_BLOB_SIZE_BYTES;
     quality = computeNextQuality(quality, ratio);
-    blob = await toBlobOrThrow(quality);
+    // For PNG, recompress by downscaling slightly if strictly necessary
+    const scaleAdjust = Math.max(0.5, 1 / Math.max(MIN_RATIO_DIVISOR, ratio));
+    const resizedWidth = Math.max(1, Math.round(canvas.width * scaleAdjust));
+    const resizedHeight = Math.max(1, Math.round(canvas.height * scaleAdjust));
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = resizedWidth;
+    tmpCanvas.height = resizedHeight;
+    const tctx = tmpCanvas.getContext('2d', { alpha: false });
+    tctx.fillStyle = '#FFFFFF';
+    tctx.fillRect(0, 0, resizedWidth, resizedHeight);
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
+    tctx.drawImage(canvas, 0, 0, resizedWidth, resizedHeight);
+    blob = await new Promise((resolve, reject) => tmpCanvas.toBlob((blobResult) => {
+      if (blobResult) resolve(blobResult); else reject(new Error('Unable to process image'));
+    }, mime));
     attempts += 1;
   }
   const arrayBuffer = await blob.arrayBuffer();
