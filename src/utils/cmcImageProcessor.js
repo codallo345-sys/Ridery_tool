@@ -48,7 +48,7 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const limitedScale = (srcWidth > 0 && srcHeight > 0)
     ? Math.min(maxRenderWidth / srcWidth, maxRenderHeight / srcHeight)
     : 1;
-  const scaleFactor = Math.max(limitedScale, 0); // bounded by maxRenderWidth/maxRenderHeight (~4K target)
+  const scaleFactor = limitedScale; // allows upscaling to 4K while still downscaling when inputs exceed the bounds
   const targetWidth = Math.max(1, Math.round(Math.min(maxRenderWidth, srcWidth * scaleFactor)));
   const targetHeight = Math.max(1, Math.round(Math.min(maxRenderHeight, srcHeight * scaleFactor)));
   const swap = rot === 90 || rot === 270;
