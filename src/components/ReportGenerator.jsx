@@ -353,8 +353,10 @@ export default function ReportGenerator({ currentOption }) {
         } else {
           throw new Error(`Unsupported image format for PDF: ${mime}`);
         }
-        const page = pdfDoc.addPage([pdfImage.width, pdfImage.height]);
-        page.drawImage(pdfImage, { x: 0, y: 0, width: pdfImage.width, height: pdfImage.height });
+        const pageWidth = result.renderWidth || pdfImage.width;
+        const pageHeight = result.renderHeight || pdfImage.height;
+        const page = pdfDoc.addPage([pageWidth, pageHeight]);
+        page.drawImage(pdfImage, { x: 0, y: 0, width: pageWidth, height: pageHeight });
       }
       const pdfBytes = await pdfDoc.save();
       const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -433,7 +435,7 @@ export default function ReportGenerator({ currentOption }) {
         await buildPdfFromImages(pdfImages);
       } catch (err) {
         pdfOk = false;
-        alert('El PDF HD no pudo generarse. El .docx sí se descargó.');
+        alert('El PDF de alta definición no pudo generarse. El .docx sí se descargó.');
       }
       if (pdfOk) setSnackOpen(true);
     } catch (error) {
