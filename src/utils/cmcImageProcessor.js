@@ -48,7 +48,11 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const limitedScale = (srcWidth > 0 && srcHeight > 0)
     ? Math.min(maxRenderWidth / srcWidth, maxRenderHeight / srcHeight)
     : 1;
-  const scaleFactor = Math.max(limitedScale, 0); // bounded by maxRenderWidth/maxRenderHeight (~4K target)
+  const maxUpscaleFactor = Math.max(
+    maxRenderWidth / Math.max(srcWidth, 1),
+    maxRenderHeight / Math.max(srcHeight, 1)
+  );
+  const scaleFactor = Math.min(Math.max(limitedScale, 0), maxUpscaleFactor); // bounded by maxRenderWidth/maxRenderHeight (~4K target)
   const targetWidth = Math.max(1, Math.round(Math.min(maxRenderWidth, srcWidth * scaleFactor)));
   const targetHeight = Math.max(1, Math.round(Math.min(maxRenderHeight, srcHeight * scaleFactor)));
   const swap = rot === 90 || rot === 270;
@@ -91,13 +95,11 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   let quality = 0.9;
   let blob = await toBlobOrThrow(quality);
   let attempts = 0;
-  if (Number.isFinite(MAX_BLOB_SIZE_BYTES)) {
-    while (blob.size > MAX_BLOB_SIZE_BYTES && quality > MIN_JPEG_QUALITY && attempts < MAX_COMPRESSION_STEPS) {
-      const ratio = blob.size / MAX_BLOB_SIZE_BYTES;
-      quality = computeNextQuality(quality, ratio);
-      blob = await toBlobOrThrow(quality);
-      attempts += 1;
-    }
+  while (blob.size > MAX_BLOB_SIZE_BYTES && quality > MIN_JPEG_QUALITY && attempts < MAX_COMPRESSION_STEPS) {
+    const ratio = blob.size / MAX_BLOB_SIZE_BYTES;
+    quality = computeNextQuality(quality, ratio);
+    blob = await toBlobOrThrow(quality);
+    attempts += 1;
   }
   const arrayBuffer = await blob.arrayBuffer();
 
