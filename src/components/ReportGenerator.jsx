@@ -4,7 +4,6 @@ import {
   Document, Packer, Paragraph, ImageRun, TextRun, AlignmentType,
   Table, TableRow, TableCell, WidthType, BorderStyle
 } from 'docx';
-import { PDFDocument } from 'pdf-lib';
 import { saveAs } from 'file-saver';
 import {
   Container, Button, Grid, Typography, Box, Paper, Chip,
@@ -46,9 +45,9 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.56, heightCm: 6.56 },
   vertical: { widthCm: 6.56, heightCm: 6.56 }
 };
-const QUALITY_RENDER_SCALE = 4; // render at even higher resolution to improve clarity in Word
-const MIN_OUTPUT_WIDTH_PX = 7680; // 8K width target
-const MIN_OUTPUT_HEIGHT_PX = 4320; // 8K height target
+const QUALITY_RENDER_SCALE = 6; // render at ultra-high resolution to improve clarity in Word
+const MIN_OUTPUT_WIDTH_PX = 15360; // 16K width target
+const MIN_OUTPUT_HEIGHT_PX = 8640; // 16K height target
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -121,7 +120,7 @@ Uso:
 };
 
 // --- funciones para generar tablas de imágenes (.docx) ---
-const generateImageTableForGroup = async (slots, cols, orientation, docChildren, onProgress, pdfCollector) => {
+const generateImageTableForGroup = async (slots, cols, orientation, docChildren, onProgress) => {
   if (!slots || slots.length === 0) return;
   const safeCols = Math.max(1, cols || 1);
   const limit = pLimit(CONCURRENCY_LIMIT);
@@ -161,7 +160,6 @@ const generateImageTableForGroup = async (slots, cols, orientation, docChildren,
           minHeight: minHeightPx
         };
         const result = await processImageForReport(s.file, s.rotation || 0, s.orientation || 'horizontal', targetDims);
-        if (pdfCollector) pdfCollector.push({ slot: s, result });
         if (onProgress) onProgress();
         return { slot: s, result, dims };
       })
@@ -338,31 +336,6 @@ export default function ReportGenerator({ currentOption }) {
     return null;
   };
 
-  const buildPdfFromImages = async (images) => {
-    if (!images || images.length === 0) return;
-    try {
-      const pdfDoc = await PDFDocument.create();
-      for (const { result } of images) {
-        const bytes = new Uint8Array(result.buffer);
-        const mime = (result.mime || 'image/jpeg').toLowerCase();
-        const isPng = mime.includes('png');
-        const isJpeg = mime.includes('jpg') || mime.includes('jpeg');
-        if (!isPng && !isJpeg) throw new Error(`Unsupported image format for PDF: ${mime || 'unknown'}`);
-        const pdfImage = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
-        const pageWidth = result.renderWidth || pdfImage.width;
-        const pageHeight = result.renderHeight || pdfImage.height;
-        const page = pdfDoc.addPage([pageWidth, pageHeight]);
-        page.drawImage(pdfImage, { x: 0, y: 0, width: pageWidth, height: pageHeight });
-      }
-      const pdfBytes = await pdfDoc.save();
-      const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-      saveAs(pdfBlob, `Reporte_CMC_${Date.now()}_HD.pdf`);
-    } catch (err) {
-      console.error(`PDF HD generation failed for ${images.length} imágenes`, err);
-      throw err;
-    }
-  };
-
   const handleGenerateWord = async () => {
     const validSlots = slots.filter(s => s.file);
     if (validSlots.length === 0) { alert('Sube al menos una imagen.'); return; }
@@ -372,7 +345,6 @@ export default function ReportGenerator({ currentOption }) {
     setTotalToProcess(validSlots.length);
 
     try {
-      const pdfImages = [];
       const docChildren = [];
 
       docChildren.push(new Paragraph({
@@ -405,9 +377,9 @@ export default function ReportGenerator({ currentOption }) {
         const bySize = { normal: [], mediana: [], grande: [] };
         arr.forEach(s => bySize[s.size || 'normal'].push(s));
 
-        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, COLS_PER_ROW, orientation, docChildren, onProgress, pdfImages);
-        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, COLS_PER_ROW, orientation, docChildren, onProgress, pdfImages);
-        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, COLS_PER_ROW, orientation, docChildren, onProgress, pdfImages);
+        if (bySize.normal.length) await generateImageTableForGroup(bySize.normal, COLS_PER_ROW, orientation, docChildren, onProgress);
+        if (bySize.mediana.length) await generateImageTableForGroup(bySize.mediana, COLS_PER_ROW, orientation, docChildren, onProgress);
+        if (bySize.grande.length) await generateImageTableForGroup(bySize.grande, COLS_PER_ROW, orientation, docChildren, onProgress);
       };
 
       const onProgress = () => setProcessedCount(p => p + 1);
@@ -426,14 +398,7 @@ export default function ReportGenerator({ currentOption }) {
 
       const blob = await Packer.toBlob(doc);
       saveAs(blob, `Reporte_CMC_${Date.now()}.docx`);
-      let pdfOk = true;
-      try {
-        await buildPdfFromImages(pdfImages);
-      } catch (err) {
-        pdfOk = false;
-        alert('El PDF de alta definición no pudo generarse. El .docx sí se descargó.');
-      }
-      if (pdfOk) setSnackOpen(true);
+      setSnackOpen(true);
     } catch (error) {
       console.error(error);
       alert('Error al generar reporte.');
