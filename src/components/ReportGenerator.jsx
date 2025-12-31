@@ -45,9 +45,9 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.56, heightCm: 6.56 },
   vertical: { widthCm: 6.56, heightCm: 6.56 }
 };
-const QUALITY_RENDER_SCALE = 10; // render at ultra-extreme resolution to improve clarity in Word
-const MIN_OUTPUT_WIDTH_PX = 61440; // 64K width target
-const MIN_OUTPUT_HEIGHT_PX = 34560; // 64K height target
+const QUALITY_RENDER_SCALE = 8; // back to stable ultra-high resolution
+const MIN_OUTPUT_WIDTH_PX = 30720; // 32K width target
+const MIN_OUTPUT_HEIGHT_PX = 17280; // 32K height target
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {

@@ -1,7 +1,7 @@
 // src/utils/cmcImageProcessor.js
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
-const DEFAULT_RENDER_SCALE = 3;
+const DEFAULT_RENDER_SCALE = 2;
 const MAX_BLOB_SIZE_BYTES = Infinity; // no size cap per request for maximum HD quality
 const MIN_JPEG_QUALITY = 0.55;
 const AGGRESSIVE_QUALITY_STEP = 0.6;
