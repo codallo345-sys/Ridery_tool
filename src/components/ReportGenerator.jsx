@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Document, Packer, Paragraph, ImageRun, TextRun, AlignmentType,
-  Table, TableRow, TableCell, WidthType, BorderStyle, HeightRule
+  Table, TableRow, TableCell, WidthType, BorderStyle, HeightRule, VerticalAlign
 } from 'docx';
 import { saveAs } from 'file-saver';
 import {
@@ -45,13 +45,13 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.56, heightCm: 6.56 },
   vertical: { widthCm: 6.56, heightCm: 6.56 }
 };
-const QUALITY_RENDER_SCALE = 3; // render at higher resolution to improve clarity in Word
-const MIN_OUTPUT_WIDTH_PX = 1920;
-const MIN_OUTPUT_HEIGHT_PX = 1080;
-const HORIZONTAL_TITLES = ['Viaje', 'Mapa', 'Dispatcher', 'Ticket', 'Movimiento Cliente', 'Calculadora'];
+const QUALITY_RENDER_SCALE = 4;
+const MIN_OUTPUT_WIDTH_PX = 2560;
+const MIN_OUTPUT_HEIGHT_PX = 1440;
 const HORIZONTAL_LABEL_WIDTH_CM = 3;
 const HORIZONTAL_IMAGE_WIDTH_CM = 15;
 const HORIZONTAL_IMAGE_HEIGHT_CM = 6.09;
+const SMALL_IMAGE_HEIGHT_CM = 1;
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -246,91 +246,100 @@ const generateHorizontalImageTable = async (slots, docChildren, onProgress) => {
   const imageDisplayWidthPx = Math.max(1, Math.round(HORIZONTAL_IMAGE_WIDTH_CM * CM_TO_PIXELS));
   const imageDisplayHeightPx = Math.max(1, Math.round(HORIZONTAL_IMAGE_HEIGHT_CM * CM_TO_PIXELS));
   const rowHeightTwips = Math.round(HORIZONTAL_IMAGE_HEIGHT_CM * CM_TO_TWIPS);
-
-  const remaining = [...slots];
-  const pickSlotForTitle = (title) => {
-    const normalizedTitle = title.toLowerCase();
-    const exactIdx = remaining.findIndex(s => (s.title || '').trim().toLowerCase() === normalizedTitle);
-    if (exactIdx >= 0) return remaining.splice(exactIdx, 1)[0];
-    const partialIdx = remaining.findIndex(s => (s.title || '').toLowerCase().includes(normalizedTitle));
-    if (partialIdx >= 0) return remaining.splice(partialIdx, 1)[0];
-    if (remaining.length > 0) return remaining.shift();
-    return null;
-  };
+  const smallHeightPx = Math.round(SMALL_IMAGE_HEIGHT_CM * CM_TO_PIXELS);
 
   const baseBorder = { style: BorderStyle.SINGLE, size: 4, color: BORDER_COLOR };
   const noBorder = { style: BorderStyle.NIL };
 
+  const processed = [];
+  for (const s of slots) {
+    const result = await processImageForReport(
+      s.file,
+      s.rotation || 0,
+      s.orientation || 'horizontal',
+      {
+        width: imageDisplayWidthPx,
+        height: imageDisplayHeightPx,
+        displayWidth: imageDisplayWidthPx,
+        displayHeight: imageDisplayHeightPx,
+        renderScale: QUALITY_RENDER_SCALE,
+        minWidth: MIN_OUTPUT_WIDTH_PX,
+        minHeight: MIN_OUTPUT_HEIGHT_PX
+      }
+    );
+    if (onProgress) onProgress();
+    processed.push({ slot: s, result });
+  }
+
   const rows = [];
+  let pendingSmall = [];
 
-  for (let i = 0; i < HORIZONTAL_TITLES.length; i++) {
-    const title = HORIZONTAL_TITLES[i];
-    const selected = pickSlotForTitle(title);
-    let imageParagraph = new Paragraph({ text: '' });
-
-    if (selected && selected.file) {
-      const result = await processImageForReport(
-        selected.file,
-        selected.rotation || 0,
-        selected.orientation || 'horizontal',
-        {
-          width: imageDisplayWidthPx,
-          height: imageDisplayHeightPx,
-          displayWidth: imageDisplayWidthPx,
-          displayHeight: imageDisplayHeightPx,
-          renderScale: QUALITY_RENDER_SCALE,
-          minWidth: MIN_OUTPUT_WIDTH_PX,
-          minHeight: MIN_OUTPUT_HEIGHT_PX
-        }
-      );
-      if (onProgress) onProgress();
-      const imageType = (result.mime && result.mime.toLowerCase().includes('png')) ? 'png' : 'jpeg';
-      const imgWidth = result.displayWidth || result.width || imageDisplayWidthPx;
-      const imgHeight = result.displayHeight || result.height || imageDisplayHeightPx;
-      imageParagraph = new Paragraph({
+  const pushRow = (items) => {
+    if (!items || items.length === 0) return;
+    const labelText = items.map(i => i.slot.title || 'Evidencia').join(' / ');
+    const imageParagraphs = items.map((item) => {
+      const imageType = (item.result.mime && item.result.mime.toLowerCase().includes('png')) ? 'png' : 'jpeg';
+      const imgWidth = item.result.displayWidth || item.result.width || imageDisplayWidthPx;
+      const imgHeight = item.result.displayHeight || item.result.height || imageDisplayHeightPx;
+      return new Paragraph({
         children: [new ImageRun({
-          data: result.buffer,
+          data: item.result.buffer,
           transformation: { width: imgWidth, height: imgHeight },
           type: imageType
         })],
         alignment: AlignmentType.CENTER,
         spacing: { after: 40 }
       });
-    }
+    });
 
-    const isFirstRow = i === 0;
     const labelCell = new TableCell({
       children: [
         new Paragraph({
-          children: [new TextRun({ text: title, bold: true, size: FONT_SIZE, font: 'Calibri' })],
+          children: [new TextRun({ text: labelText, bold: true, size: FONT_SIZE, font: 'Calibri' })],
           alignment: AlignmentType.CENTER
         })
       ],
       width: { size: labelWidthTwips, type: WidthType.DXA },
       borders: {
-        top: isFirstRow ? baseBorder : noBorder,
+        top: rows.length === 0 ? baseBorder : noBorder,
         bottom: baseBorder,
         left: noBorder,
         right: baseBorder
-      }
+      },
+      verticalAlign: VerticalAlign.CENTER
     });
 
     const imageCell = new TableCell({
-      children: [imageParagraph],
+      children: imageParagraphs,
       width: { size: imageWidthTwips, type: WidthType.DXA },
       borders: {
-        top: isFirstRow ? baseBorder : noBorder,
+        top: rows.length === 0 ? baseBorder : noBorder,
         bottom: baseBorder,
         left: noBorder,
         right: noBorder
-      }
+      },
+      verticalAlign: VerticalAlign.CENTER
     });
 
     rows.push(new TableRow({
       children: [labelCell, imageCell],
       height: { value: rowHeightTwips, rule: HeightRule.EXACT }
     }));
+  };
+
+  for (const item of processed) {
+    const imgHeight = item.result.displayHeight || item.result.height || imageDisplayHeightPx;
+    if (imgHeight < smallHeightPx) {
+      pendingSmall.push(item);
+      continue;
+    }
+    if (pendingSmall.length > 0) {
+      pushRow(pendingSmall);
+      pendingSmall = [];
+    }
+    pushRow([item]);
   }
+  if (pendingSmall.length > 0) pushRow(pendingSmall);
 
   const imageTable = new Table({
     rows,
@@ -456,7 +465,7 @@ export default function ReportGenerator({ currentOption }) {
     setProcessedCount(0);
     const horizontalSlots = validSlots.filter((s) => (s.orientation ?? 'horizontal') === 'horizontal');
     const verticalSlots = validSlots.filter(s => s.orientation === 'vertical');
-    const totalProcessable = Math.min(horizontalSlots.length, HORIZONTAL_TITLES.length) + verticalSlots.length;
+    const totalProcessable = horizontalSlots.length + verticalSlots.length;
     setTotalToProcess(totalProcessable);
 
     try {
@@ -493,7 +502,7 @@ export default function ReportGenerator({ currentOption }) {
 
       const onProgress = () => setProcessedCount(p => p + 1);
 
-      if (horizontalSlots.length > 0) await generateHorizontalImageTable(horizontalSlots.slice(0, HORIZONTAL_TITLES.length), docChildren, onProgress);
+      if (horizontalSlots.length > 0) await generateHorizontalImageTable(horizontalSlots, docChildren, onProgress);
       if (verticalSlots.length > 0) await groupAndProcess(verticalSlots, 'vertical', onProgress);
 
       const doc = new Document({
