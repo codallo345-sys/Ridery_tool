@@ -249,8 +249,11 @@ const generateHorizontalImageTable = async (slots, docChildren, onProgress) => {
 
   const remaining = [...slots];
   const pickSlotForTitle = (title) => {
-    const idx = remaining.findIndex(s => (s.title || '').toLowerCase().includes(title.toLowerCase()));
-    if (idx >= 0) return remaining.splice(idx, 1)[0];
+    const normalizedTitle = title.toLowerCase();
+    const exactIdx = remaining.findIndex(s => (s.title || '').trim().toLowerCase() === normalizedTitle);
+    if (exactIdx >= 0) return remaining.splice(exactIdx, 1)[0];
+    const partialIdx = remaining.findIndex(s => (s.title || '').toLowerCase().includes(normalizedTitle));
+    if (partialIdx >= 0) return remaining.splice(partialIdx, 1)[0];
     if (remaining.length > 0) return remaining.shift();
     return null;
   };
