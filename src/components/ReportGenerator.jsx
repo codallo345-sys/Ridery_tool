@@ -7,7 +7,7 @@ import {
 import { saveAs } from 'file-saver';
 import {
   Container, Button, Grid, Typography, Box, Paper, Chip,
-  LinearProgress, Snackbar, Alert, Tabs, Tab
+  LinearProgress, Snackbar, Alert, Tabs, Tab, TextField
 } from '@mui/material';
 import ImageSlot from './ImageSlot';
 import { processImageForReport } from '../utils/cmcImageProcessor';
@@ -45,9 +45,13 @@ const BASE_DIMS_CM = {
   horizontal: { widthCm: 6.56, heightCm: 6.56 },
   vertical: { widthCm: 6.56, heightCm: 6.56 }
 };
-const QUALITY_RENDER_SCALE = 3; // render at higher resolution to improve clarity in Word
-const MIN_OUTPUT_WIDTH_PX = 1920;
-const MIN_OUTPUT_HEIGHT_PX = 1080;
+const QUALITY_RENDER_SCALE = 4; // render at higher resolution to improve clarity in Word
+const MIN_OUTPUT_WIDTH_PX = 3840;
+const MIN_OUTPUT_HEIGHT_PX = 2160;
+const DEFAULT_REPORT_TITLE = 'REPORTE CMC HD';
+const WHITESPACE_PATTERN = /\s+/g;
+const INVALID_CHARS_PATTERN = /[^a-zA-Z0-9_-]/g;
+const sanitizeForFilename = (value) => (value || '').trim().replace(WHITESPACE_PATTERN, '_').replace(INVALID_CHARS_PATTERN, '');
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -243,6 +247,9 @@ export default function ReportGenerator({ currentOption }) {
     amountAdmin: 0, cashGiven: 0, amountReal: 0, surgeAdmin: 1, surgeReal: 1, surgeType: 'none', cashGivenAdmin: 0, realCashGiven: 0
   });
 
+  const [reportTitle, setReportTitle] = useState(DEFAULT_REPORT_TITLE);
+  const [incidentTitle, setIncidentTitle] = useState('');
+
   const [guideMap, setGuideMap] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('cmc_guides') || '{}');
@@ -283,6 +290,9 @@ export default function ReportGenerator({ currentOption }) {
     setCalcState({
       amountAdmin: 0, cashGiven: 0, amountReal: 0, surgeAdmin: 1, surgeReal: 1, surgeType: 'none', cashGivenAdmin: 0, realCashGiven: 0
     });
+    const defaultTitle = currentOption?.name ? `REPORTE ${currentOption.name} HD` : DEFAULT_REPORT_TITLE;
+    setReportTitle(defaultTitle);
+    setIncidentTitle(currentOption?.name || '');
     const onStorage = () => setIsAdmin(!!localStorage.getItem('cmc_is_admin'));
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
@@ -340,6 +350,9 @@ export default function ReportGenerator({ currentOption }) {
     const validSlots = slots.filter(s => s.file);
     if (validSlots.length === 0) { alert('Sube al menos una imagen.'); return; }
 
+    const effectiveReportTitle = (reportTitle || DEFAULT_REPORT_TITLE).trim() || DEFAULT_REPORT_TITLE;
+    const effectiveIncidentTitle = (incidentTitle || currentOption?.name || 'Incidencia').trim();
+
     setLoading(true);
     setProcessedCount(0);
     setTotalToProcess(validSlots.length);
@@ -348,14 +361,14 @@ export default function ReportGenerator({ currentOption }) {
       const docChildren = [];
 
       docChildren.push(new Paragraph({
-        children: [new TextRun({ text: 'REPORTE CMC', bold: true, size: 28, font: 'Calibri' })],
+        children: [new TextRun({ text: effectiveReportTitle, bold: true, size: 28, font: 'Calibri' })],
         alignment: AlignmentType.CENTER,
         spacing: { after: 80 }
       }));
 
       if (currentOption) {
         docChildren.push(new Paragraph({
-          children: [new TextRun({ text: `CASO: ${currentOption.name}`, bold: true, size: 24, font: 'Calibri' })],
+          children: [new TextRun({ text: `CASO: ${effectiveIncidentTitle}`, bold: true, size: 24, font: 'Calibri' })],
           spacing: { after: 60 }
         }));
         const ticket = extractTicketFromSlots(validSlots);
@@ -397,7 +410,9 @@ export default function ReportGenerator({ currentOption }) {
       });
 
       const blob = await Packer.toBlob(doc);
-      saveAs(blob, `Reporte_CMC_${Date.now()}.docx`);
+      const safeIncident = sanitizeForFilename(effectiveIncidentTitle) || 'CMC';
+      const safeTitle = sanitizeForFilename(effectiveReportTitle) || 'Reporte';
+      saveAs(blob, `${safeTitle}_${safeIncident}_${Date.now()}.docx`);
       setSnackOpen(true);
     } catch (error) {
       console.error(error);
@@ -459,9 +474,36 @@ export default function ReportGenerator({ currentOption }) {
               fontWeight: 700,
               textTransform: 'uppercase'
             }}
-          />
-        </Box>
-      </motion.div>
+            />
+          </Box>
+        </motion.div>
+
+        {!isRecalculoPanel && !isCategoryPanel && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+            <TextField
+              label="Título del reporte (Word)"
+              value={reportTitle}
+              onChange={(e) => setReportTitle(e.target.value)}
+              variant="filled"
+              size="small"
+              sx={{ minWidth: 260 }}
+              InputProps={{ sx: { color: 'white', fontWeight: 700, bgcolor: 'rgba(255,255,255,0.04)' } }}
+              InputLabelProps={{ sx: { color: 'rgba(255,255,255,0.7)' } }}
+            />
+            <TextField
+              label="Título de la incidencia"
+              value={incidentTitle}
+              onChange={(e) => setIncidentTitle(e.target.value)}
+              variant="filled"
+              size="small"
+              sx={{ minWidth: 260 }}
+              InputProps={{ sx: { color: 'white', fontWeight: 700, bgcolor: 'rgba(255,255,255,0.04)' } }}
+              InputLabelProps={{ sx: { color: 'rgba(255,255,255,0.7)' } }}
+              helperText="Se usa en el encabezado y nombre del archivo"
+              FormHelperTextProps={{ sx: { color: 'rgba(255,255,255,0.6)' } }}
+            />
+          </Box>
+        )}
 
       <Snackbar open={snackOpen} autoHideDuration={8000} onClose={() => setSnackOpen(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
         <Alert

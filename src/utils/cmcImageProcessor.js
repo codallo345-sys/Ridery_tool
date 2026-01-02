@@ -1,14 +1,14 @@
 // src/utils/cmcImageProcessor.js
 // Procesa una File/Image y devuelve { buffer, width, height, mime }
 // - processImageForReport(file, rotation, orientation, targetDims)
-const DEFAULT_RENDER_SCALE = 1.5;
-const MAX_BLOB_SIZE_BYTES = 20 * 1024 * 1024;
-const MIN_JPEG_QUALITY = 0.55;
-const AGGRESSIVE_QUALITY_STEP = 0.6;
-const NORMAL_QUALITY_STEP = 0.8;
-const MAX_COMPRESSION_STEPS = 8;
-const AGGRESSIVE_THRESHOLD_MULTIPLIER = 2;
-const MIN_RATIO_DIVISOR = 1.1;
+import pica from 'pica';
+
+const DEFAULT_RENDER_SCALE = 2.5;
+const SAFE_MAX_DIMENSION = 10000;
+const PNG_MIME = 'image/png';
+const MIN_ASPECT_RATIO = 0.0001;
+const NO_ALPHA = { alpha: false };
+const PICA_QUALITY = 3;
 
 export async function processImageForReport(file, rotation = 0, orientation = 'horizontal', targetDims = { width: 800, height: 600, renderScale: DEFAULT_RENDER_SCALE }) {
   if (!file) throw new Error('No file provided');
@@ -38,27 +38,49 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
   const renderScale = Math.max(0.1, Number(targetDims?.renderScale || DEFAULT_RENDER_SCALE));
   const minRenderWidth = Math.round(targetDims?.minWidth || 0);
   const minRenderHeight = Math.round(targetDims?.minHeight || 0);
-  const maxRenderWidth = Math.max(minRenderWidth, Math.round(displayWidth * renderScale), displayWidth);
-  const maxRenderHeight = Math.max(minRenderHeight, Math.round(displayHeight * renderScale), displayHeight);
+  const desiredWidth = Math.max(displayWidth, displayWidth * renderScale, minRenderWidth);
+  const desiredHeight = Math.max(displayHeight, displayHeight * renderScale, minRenderHeight);
 
   const rot = ((rotation || 0) % 360 + 360) % 360;
   const srcWidth = img.width || img.naturalWidth || displayWidth;
   const srcHeight = img.height || img.naturalHeight || displayHeight;
-  const needsRotation = rot !== 0;
-  const limitedScale = (srcWidth > 0 && srcHeight > 0)
-    ? Math.min(maxRenderWidth / srcWidth, maxRenderHeight / srcHeight)
-    : 1;
-  const scaleFactor = Math.min(1, limitedScale);
-  const targetWidth = Math.max(1, Math.round(srcWidth * scaleFactor));
-  const targetHeight = Math.max(1, Math.round(srcHeight * scaleFactor));
+  const fallbackWidth = orientation === 'vertical'
+    ? Math.max(targetDims?.width || displayWidth, displayWidth)
+    : Math.max(targetDims?.width || displayWidth, 1);
+  const fallbackHeight = Math.max(targetDims?.height || displayHeight, displayHeight);
+  const aspectRatio = (srcWidth > 0 && srcHeight > 0)
+    ? srcHeight / srcWidth
+    : (fallbackHeight / Math.max(fallbackWidth, 1));
+
+  let targetWidth = Math.min(SAFE_MAX_DIMENSION, Math.round(Math.max(srcWidth, desiredWidth)));
+  let targetHeight = Math.min(SAFE_MAX_DIMENSION, Math.round(targetWidth * aspectRatio));
+
+  if (targetHeight < Math.min(SAFE_MAX_DIMENSION, Math.max(srcHeight, desiredHeight))) {
+    targetHeight = Math.min(SAFE_MAX_DIMENSION, Math.round(Math.max(srcHeight, desiredHeight)));
+    targetWidth = Math.min(SAFE_MAX_DIMENSION, Math.round(targetHeight / Math.max(aspectRatio, MIN_ASPECT_RATIO)));
+  }
+
   const swap = rot === 90 || rot === 270;
   const canvasWidth = swap ? targetHeight : targetWidth;
   const canvasHeight = swap ? targetWidth : targetHeight;
 
+  const sourceCanvas = document.createElement('canvas');
+  sourceCanvas.width = srcWidth;
+  sourceCanvas.height = srcHeight;
+  const sourceCtx = sourceCanvas.getContext('2d', NO_ALPHA);
+  sourceCtx.drawImage(img, 0, 0);
+
+  const resizedCanvas = document.createElement('canvas');
+  resizedCanvas.width = targetWidth;
+  resizedCanvas.height = targetHeight;
+
+  const resizer = pica();
+  await resizer.resize(sourceCanvas, resizedCanvas, { alpha: false, quality: PICA_QUALITY });
+
   const canvas = document.createElement('canvas');
   canvas.width = canvasWidth;
   canvas.height = canvasHeight;
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const ctx = canvas.getContext('2d', NO_ALPHA);
 
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -70,42 +92,29 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     ctx.save();
     ctx.translate(canvasWidth / 2, canvasHeight / 2);
     ctx.rotate((rot * Math.PI) / 180);
-    ctx.drawImage(img, -targetWidth / 2, -targetHeight / 2, targetWidth, targetHeight);
+    ctx.drawImage(resizedCanvas, -targetWidth / 2, -targetHeight / 2, targetWidth, targetHeight);
     ctx.restore();
   } else {
-    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+    ctx.drawImage(resizedCanvas, 0, 0, targetWidth, targetHeight);
   }
 
-  const mime = 'image/jpeg';
-  const toBlobOrThrow = async (q) => {
+  const mime = PNG_MIME;
+  const toBlobOrThrow = async () => {
     const b = await new Promise((resolve, reject) => canvas.toBlob((blobResult) => {
       if (blobResult) resolve(blobResult); else reject(new Error('Unable to process image'));
-    }, mime, q));
+    }, mime, 1));
     return b;
   };
-  const computeNextQuality = (currentQuality, sizeRatio) => {
-    const step = sizeRatio > AGGRESSIVE_THRESHOLD_MULTIPLIER ? AGGRESSIVE_QUALITY_STEP : NORMAL_QUALITY_STEP;
-    const projectedQuality = Math.max(MIN_JPEG_QUALITY, currentQuality / Math.max(MIN_RATIO_DIVISOR, sizeRatio));
-    return Math.max(MIN_JPEG_QUALITY, Math.min(projectedQuality, currentQuality * step));
-  };
-  let quality = 0.9;
-  let blob = await toBlobOrThrow(quality);
-  let attempts = 0;
-  while (blob.size > MAX_BLOB_SIZE_BYTES && quality > MIN_JPEG_QUALITY && attempts < MAX_COMPRESSION_STEPS) {
-    const ratio = blob.size / MAX_BLOB_SIZE_BYTES;
-    quality = computeNextQuality(quality, ratio);
-    blob = await toBlobOrThrow(quality);
-    attempts += 1;
-  }
+  const blob = await toBlobOrThrow();
   const arrayBuffer = await blob.arrayBuffer();
 
   // Adjust display dimensions respecting the real aspect ratio to avoid distortion
-  const aspectRatio = canvasHeight / canvasWidth;
+  const canvasAspectRatio = canvasHeight / canvasWidth;
   let displayW = displayWidth;
-  let displayH = Math.max(1, Math.round(displayW * aspectRatio));
+  let displayH = Math.max(1, Math.round(displayW * canvasAspectRatio));
   if (displayH > displayHeight) {
     displayH = displayHeight;
-    displayW = Math.max(1, Math.round(displayH / aspectRatio));
+    displayW = Math.max(1, Math.round(displayH / canvasAspectRatio));
   }
 
   return {
@@ -114,6 +123,8 @@ export async function processImageForReport(file, rotation = 0, orientation = 'h
     height: displayH,
     renderWidth: canvasWidth,
     renderHeight: canvasHeight,
-    mime
+    mime,
+    displayWidth,
+    displayHeight
   };
 }
