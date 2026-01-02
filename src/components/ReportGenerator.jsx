@@ -51,7 +51,7 @@ const MIN_OUTPUT_HEIGHT_PX = 1440;
 const HORIZONTAL_LABEL_WIDTH_CM = 3;
 const HORIZONTAL_IMAGE_WIDTH_CM = 15;
 const HORIZONTAL_IMAGE_HEIGHT_CM = 6.09;
-const SMALL_IMAGE_HEIGHT_CM = 1;
+const SMALL_IMAGE_HEIGHT_CM = 3;
 
 // --- Guías por defecto ---
 const DEFAULT_GUIDES = {
@@ -273,6 +273,7 @@ const generateHorizontalImageTable = async (slots, docChildren, onProgress) => {
 
   const rows = [];
   let pendingSmall = [];
+  let pendingSmallHeight = 0;
 
   const pushRow = (items) => {
     if (!items || items.length === 0) return;
@@ -330,12 +331,21 @@ const generateHorizontalImageTable = async (slots, docChildren, onProgress) => {
   for (const item of processed) {
     const imgHeight = item.result.displayHeight || item.result.height || imageDisplayHeightPx;
     if (imgHeight < smallHeightPx) {
-      pendingSmall.push(item);
+      const projected = pendingSmallHeight + imgHeight;
+      if (projected <= imageDisplayHeightPx) {
+        pendingSmall.push(item);
+        pendingSmallHeight = projected;
+      } else {
+        pushRow(pendingSmall);
+        pendingSmall = [item];
+        pendingSmallHeight = imgHeight;
+      }
       continue;
     }
     if (pendingSmall.length > 0) {
       pushRow(pendingSmall);
       pendingSmall = [];
+      pendingSmallHeight = 0;
     }
     pushRow([item]);
   }
