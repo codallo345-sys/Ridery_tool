@@ -1,0 +1,42 @@
+{
+  "name": "cmc-dashboard",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.6",
+    "@mui/material": "^7.3.6",
+    "browser-image-compression": "^1.0.17",
+    "docx": "^9.5.1",
+    "file-saver": "^2.0.5",
+    "firebase": "^12.6.0",
+    "framer-motion": "^12.23.25",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.4",
+    "nanoid": "^5.1.6",
+    "p-limit": "^4.0.0",
+    "pica": "^9.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "vite": "^7.2.4"
+  }
+}
